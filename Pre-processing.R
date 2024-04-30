@@ -1,6 +1,8 @@
+# librerie e dataset ----
 library(readxl)
 library(quanteda)
 library(quanteda.textstats)
+library(ggplot2)
 
 setwd("C:/Users/WilliamSanteramo/OneDrive - ITS Angelo Rizzoli/Documenti/UFS/07 programmazione R/PROGETTO")
 
@@ -8,6 +10,8 @@ StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
 
 Ita_StoresReview <- StoresReview[StoresReview$lang_value == "it" | is.na(StoresReview$lang_value) == TRUE,]
 
+
+# PRE- PROCESSING DFM ----
 Testo_Corpus <- corpus(na.omit(Ita_StoresReview$text))
 textstat_summary(Testo_Corpus)
 
@@ -20,16 +24,24 @@ Testo_dfm <- dfm(tokens(Testo_Corpus,
   tokens_remove(c(stopwords("italian"))) %>%
   tokens_wordstem(language = "italian"))
 
-topfeatures(Testo_dfm,100)
-topfeatures(Contenitore,100)
+topfeatures(Testo_finito,100)
 
 summary(Testo_dfm)
 
-Contenitore <- dfm_trim(Testo_dfm,
+Testo_finito <- dfm_trim(Testo_dfm,
                         min_termfreq = 10,
+                        #max_termfreq = 500,
                         min_docfreq = 2)
-summary(Contenitore)
 
+# ANALISI ----
+Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
+
+set.seed(000)
+Review_training <- sample(Testo_Corpus, size = 200, replace = FALSE)
+
+Review_test <- subset(Testo_Corpus, Review_training = FALSE)
+
+# SUGGERIMENTI ----
 # allenamento dell'algoritmo.
 # estrazione campionaria randomica
 # 200 testi a testa
