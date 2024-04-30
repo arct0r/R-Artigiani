@@ -4,7 +4,13 @@ library(quanteda)
 library(quanteda.textstats)
 library(ggplot2)
 
-setwd("C:/Users/WilliamSanteramo/OneDrive - ITS Angelo Rizzoli/Documenti/UFS/07 programmazione R/PROGETTO")
+# setwd("C:/Users/WilliamSanteramo/OneDrive - ITS Angelo Rizzoli/Documenti/UFS/07 programmazione R/PROGETTO")
+# Vecchio setwd manuale
+
+library(rstudioapi)
+setwd(dirname(getActiveDocumentContext()$path))
+# Questo codice magico permette di settare automaticamente la working directory nella cartella in cui si trova lo script
+# è utile perchè, lavorando con git, cloniamo continuamente e non si può stare a cambiare ogni volta il path per ogni pc diverso
 
 StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
 
@@ -40,6 +46,7 @@ set.seed(000)
 Review_training <- sample(Testo_Corpus, size = 200, replace = FALSE)
 
 Review_test <- subset(Testo_Corpus, Review_training = FALSE)
+
 
 # SUGGERIMENTI ----
 # allenamento dell'algoritmo.
