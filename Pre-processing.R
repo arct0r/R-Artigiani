@@ -14,26 +14,41 @@ setwd(dirname(getActiveDocumentContext()$path))
 
 StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
 
+# Dataset con sole recensioni in italiano.
 Ita_StoresReview <- StoresReview[StoresReview$lang_value == "it" | is.na(StoresReview$lang_value) == TRUE,]
 
 
 # PRE- PROCESSING DFM ----
+
+# Creazione del Corpus prendendo solo i testi NON vuoti
 Testo_Corpus <- corpus(na.omit(Ita_StoresReview$text))
 textstat_summary(Testo_Corpus)
 
 
+# DFM - VERSIONE 1: risultato 35 MILIONI
 Testo_dfm <- dfm(tokens(Testo_Corpus,
-                              remove_numbers = TRUE,
-                              remove_punct = TRUE,
-                              remove_symbols = TRUE) %>%
-  tokens_tolower() %>% 
-  tokens_remove(c(stopwords("italian"))) %>%
-  tokens_wordstem(language = "italian"))
+                        remove_numbers = TRUE,
+                        remove_punct = TRUE,
+                        remove_symbols = TRUE) %>%
+                   tokens_tolower() %>% 
+                   tokens_remove(c(stopwords("italian"))) %>%
+                   tokens_wordstem(language = "italian"))
+
+# DFM - VERSIONE 2: risultato 32 MILIONI
+Testo_dfm <- dfm(tokens(Testo_Corpus,
+                        remove_punct = TRUE,
+                        remove_symbols = TRUE,
+                        remove_url = TRUE,
+                        remove_numbers = TRUE) %>%
+                   tokens_tolower() %>% 
+                   tokens_remove(c(stopwords("italian"))) %>%
+                   tokens_wordstem(language = "italian"))
 
 topfeatures(Testo_finito,100)
 
 summary(Testo_dfm)
 
+# Applicazione del TRIMMING: condizioni TEMPORANEE.
 Testo_finito <- dfm_trim(Testo_dfm,
                         min_termfreq = 10,
                         #max_termfreq = 500,
@@ -42,13 +57,17 @@ Testo_finito <- dfm_trim(Testo_dfm,
 # ANALISI ----
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 
+#Campionamento per il TRAINING STAGE
 set.seed(000)
 Review_training <- sample(Testo_Corpus, size = 200, replace = FALSE)
 
+# Corpus per il TEST SET
 Review_test <- Testo_Corpus[!(Testo_Corpus %in% Review_training)]
 
+# Verifica Complementari
 setequal(Testo_Corpus, union(Review_test, Review_training))
 
+# Runnare da 71 a 82 per Riempire la lista
 Lavoro <- list(
   William = rep("", 50),
   Davide = rep("", 50),
@@ -62,7 +81,9 @@ for (i in 1:4){
   k <- 50 * i
 }
 
-print(Lavoro)
+# Check list ----
+
+# Scrivere qui tutti gli step fatti e da fare
 
 
 # SUGGERIMENTI ----
