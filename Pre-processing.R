@@ -1,13 +1,10 @@
 # librerie e dataset ----
 library(readxl)
+library(rstudioapi)
 library(quanteda)
 library(quanteda.textstats)
 library(ggplot2)
 
-# setwd("C:/Users/WilliamSanteramo/OneDrive - ITS Angelo Rizzoli/Documenti/UFS/07 programmazione R/PROGETTO")
-# Vecchio setwd manuale
-
-library(rstudioapi)
 setwd(dirname(getActiveDocumentContext()$path))
 # Questo codice magico permette di settare automaticamente la working directory nella cartella in cui si trova lo script
 # è utile perchè, lavorando con git, cloniamo continuamente e non si può stare a cambiare ogni volta il path per ogni pc diverso
@@ -17,11 +14,12 @@ StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
 # Dataset con sole recensioni in italiano.
 Ita_StoresReview <- StoresReview[StoresReview$lang_value == "it" | is.na(StoresReview$lang_value) == TRUE,]
 
-
 # PRE- PROCESSING DFM ----
 
 # Creazione del Corpus prendendo solo i testi NON vuoti
 Testo_Corpus <- corpus(na.omit(Ita_StoresReview$text))
+
+# Check
 textstat_summary(Testo_Corpus)
 
 
@@ -35,6 +33,7 @@ Testo_dfm <- dfm(tokens(Testo_Corpus,
                    tokens_wordstem(language = "italian"))
 
 # DFM - VERSIONE 2: risultato 32 MILIONI
+# NON PULISCE TUTTO. !!, emoji
 Testo_dfm <- dfm(tokens(Testo_Corpus,
                         remove_punct = TRUE,
                         remove_symbols = TRUE,
@@ -43,9 +42,8 @@ Testo_dfm <- dfm(tokens(Testo_Corpus,
                    tokens_tolower() %>% 
                    tokens_remove(c(stopwords("italian"))) %>%
                    tokens_wordstem(language = "italian"))
-
+# Check
 topfeatures(Testo_finito,100)
-
 summary(Testo_dfm)
 
 # Applicazione del TRIMMING: condizioni TEMPORANEE.
@@ -54,7 +52,10 @@ Testo_finito <- dfm_trim(Testo_dfm,
                         #max_termfreq = 500,
                         min_docfreq = 2)
 
+
 # ANALISI ----
+
+# Per grafici sulle keywords
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 
 #Campionamento per il TRAINING STAGE
@@ -81,12 +82,14 @@ for (i in 1:4){
   k <- 50 * i
 }
 
+
 # Check list ----
 
 # Scrivere qui tutti gli step fatti e da fare
 
 
 # SUGGERIMENTI ----
+
 # allenamento dell'algoritmo.
 # estrazione campionaria randomica
 # 200 testi a testa
