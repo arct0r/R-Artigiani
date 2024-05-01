@@ -39,7 +39,24 @@ Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 set.seed(000)
 Review_training <- sample(Testo_Corpus, size = 200, replace = FALSE)
 
-Review_test <- subset(Testo_Corpus, Review_training = FALSE)
+Review_test <- Testo_Corpus[!(Testo_Corpus %in% Review_training)]
+
+setequal(Testo_Corpus, union(Review_test, Review_training))
+
+Lavoro <- list(
+  William = rep("", 50),
+  Davide = rep("", 50),
+  Maddalena = rep("", 50),
+  Giacomo = rep("", 50)
+)
+k <- 0
+
+for (i in 1:4){
+  Lavoro[[i]] <- Review_training[(k+1) : (50 * i)]
+  k <- 50 * i
+}
+
+print(Lavoro)
 
 # SUGGERIMENTI ----
 # allenamento dell'algoritmo.
