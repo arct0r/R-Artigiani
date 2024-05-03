@@ -43,7 +43,6 @@ Testo_dfm <- dfm(tokens(Testo_Corpus,
                    tokens_remove(c(stopwords("italian"))) %>%
                    tokens_wordstem(language = "italian"))
 # Check
-topfeatures(Testo_finito,100)
 summary(Testo_dfm)
 
 # Applicazione del TRIMMING: condizioni TEMPORANEE.
@@ -51,6 +50,8 @@ Testo_finito <- dfm_trim(Testo_dfm,
                         min_termfreq = 10,
                         #max_termfreq = 500,
                         min_docfreq = 2)
+
+topfeatures(Testo_finito,100)
 
 
 # ANALISI ----
