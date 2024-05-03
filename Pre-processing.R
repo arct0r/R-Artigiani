@@ -84,6 +84,19 @@ for (i in 1:4){
 }
 
 
+# Semplice sequenza di codice per esportare / importare ed editare su excel  --------
+library(openxlsx)
+#Export
+df = data.frame(names(Lavoro$Davide), Lavoro$Davide, NA) # put your fucking name
+colnames(df) <- c('TextNumber', 'text', 'sentiment')
+
+write.xlsx(df, "davidino.xlsx") # put your fucking name
+
+# Import
+df <- as.data.frame(read_excel("davidino.xlsx")) # put your fucking name
+# E così importate automaticamente il vostro lavoro fatto come un dataframe. 
+
+
 # Check list ----
 
 # Scrivere qui tutti gli step fatti e da fare
