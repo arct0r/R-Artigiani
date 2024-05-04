@@ -83,6 +83,7 @@ Review_test <- Corpus_Totale[!(Corpus_Totale %in% Training_data)]
 # Verifica complementare
 setequal(Corpus_Totale, union(Review_test, Campione))
 
+# Dataset del Campione
 Campione <- data.frame(
   ID <- names(Training_data),
   Persona <- rep(c("William","Davide","Maddalena","Giacomo"),each = 50),
@@ -90,19 +91,8 @@ Campione <- data.frame(
   Sentiment <- NA
 )
 
+#Esportare il Campione
 write_xlsx(Campione, "Lavoro.xlsx")
-
-# Semplice sequenza di codice per esportare / importare ed editare su excel  --------
-
-#Export
-df = data.frame(names(Lavoro$Davide), Lavoro$Davide, NA) # put your fucking name
-colnames(df) <- c('TextNumber', 'text', 'sentiment')
-
-write.xlsx(df, "davidino.xlsx") # put your fucking name
-
-# Import
-df <- as.data.frame(read_excel("davidino.xlsx")) # put your fucking name
-# E così importate automaticamente il vostro lavoro fatto come un dataframe. 
 
 
 # Check list ----
