@@ -28,7 +28,6 @@ names(Corpus_Totale) <- Ita_StoresReview$ID[is.na(Ita_StoresReview$text) == FALS
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
-
 # NON PULISCE TUTTO. !!, emoji
 Dfm_Totale <- dfm(tokens(Corpus_Totale,
                         remove_punct = TRUE,
@@ -41,7 +40,6 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
 # Applicazione del TRIMMING
 Dfm_Totale <- dfm_trim(Dfm_Totale,
                         min_termfreq = 10,
-                        #max_termfreq = 500,
                         min_docfreq = 2)
 # Lunghezza del DFM
 summary(Dfm_Totale)
@@ -56,8 +54,8 @@ Places_ita <- Ita_StoresReview[Ita_StoresReview$social == "places",]
 # Controllo testi vuoti
 apply(Tweet_ita, 2, function(x) sum(is.na(x))) # 0 testi NA
 apply(Places_ita, 2, function(x) sum(is.na(x))) # 458 testi NA!!
-Places_ita <- Places_ita[is.na(Places_ita$text) == FALSE,] # 0 testi NA.
-
+# Elimino le recensioni vuote
+Places_ita <- Places_ita[is.na(Places_ita$text) == FALSE,]
 
 # Corpus per i Tweet
 Tweet_Corpus <- corpus(Tweet_ita)
@@ -81,7 +79,7 @@ Training_data <- c(Training_tweet, Training_places)
 Review_test <- Corpus_Totale[!(Corpus_Totale %in% Training_data)]
 
 # Verifica complementare
-setequal(Corpus_Totale, union(Review_test, Campione))
+setequal(Corpus_Totale, union(Review_test, Training_data))
 
 # Dataset del Campione
 Campione <- data.frame(
@@ -92,9 +90,57 @@ Campione <- data.frame(
 )
 
 #Esportare il Campione
-write_xlsx(Campione, "Lavoro.xlsx")
+# write_xlsx(Campione, "Lavoro.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
+Campione <- read_excel("Lavoro.xlsx")
 
+# Nome text per il text_field
+apply(Campione, 2, function(x) sum(is.na(x)))
+colnames(Campione) <- c("ID", "Persona", "text","Sentiment")
 
+Campione_Corpus <- corpus(Campione)
+
+Dfm_Training <- dfm(tokens(Campione_Corpus,
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_url = TRUE,
+                         remove_numbers = TRUE) %>%
+                    tokens_tolower() %>% 
+                    tokens_remove(c(stopwords("italian"))) %>%
+                    tokens_wordstem(language = "italian"))
+
+Review_test_1 <- data.frame(
+  ID <- names(Review_test),
+  Review_test
+)
+colnames(Review_test_1) <- c("ID", "text")
+
+length(Dfm_Training@Dimnames$features) 
+length(Dfm_Test@Dimnames$features) 
+length(Prova@Dimnames$features)
+
+Review_test_1 <- corpus(Review_test_1)
+
+Dfm_Test <- dfm(tokens(Review_test_1,
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_url = TRUE,
+                         remove_numbers = TRUE) %>%
+                    tokens_tolower() %>% 
+                    tokens_remove(c(stopwords("italian"))) %>%
+                    tokens_wordstem(language = "italian"))
+
+setequal(featnames(Dfm_Training), 
+         featnames(Dfm_Test)) 
+
+Dfm_Training <- dfm_trim(Dfm_Totale,
+                       min_termfreq = 10,
+                       min_docfreq = 2)
+
+Dfm_Test <- dfm_trim(Dfm_Totale,
+                       min_termfreq = 10,
+                       min_docfreq = 2)
+Prova <- dfm_match(Dfm_Test, 
+                   features = featnames(Dfm_Training))
 # Check list ----
 
 # Scrivere qui tutti gli step fatti e da fare
