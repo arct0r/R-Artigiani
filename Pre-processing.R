@@ -89,15 +89,27 @@ Campione <- data.frame(
   Sentiment <- NA
 )
 
+Review_test_1 <- data.frame(
+  ID <- names(Review_test),
+  Review_test
+)
+
 #Esportare il Campione
 # write_xlsx(Campione, "Lavoro.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
 Campione <- read_excel("Lavoro.xlsx")
 
-# Nome text per il text_field
+Campione$Sentiment <- ifelse(Campione$Sentiment == -1, "Negativo", 
+                                  ifelse(Campione$Sentiment == 0, "Neutro", 
+                                        "Positivo"))
+
+# Verifica celle vuote.
 apply(Campione, 2, function(x) sum(is.na(x)))
+# Nome text per il text_field
 colnames(Campione) <- c("ID", "Persona", "text","Sentiment")
+colnames(Review_test_1) <- c("ID", "text")
 
 Campione_Corpus <- corpus(Campione)
+Review_test_1 <- corpus(Review_test_1)
 
 Dfm_Training <- dfm(tokens(Campione_Corpus,
                          remove_punct = TRUE,
@@ -108,43 +120,44 @@ Dfm_Training <- dfm(tokens(Campione_Corpus,
                     tokens_remove(c(stopwords("italian"))) %>%
                     tokens_wordstem(language = "italian"))
 
-Review_test_1 <- data.frame(
-  ID <- names(Review_test),
-  Review_test
-)
-colnames(Review_test_1) <- c("ID", "text")
-
-length(Dfm_Training@Dimnames$features) 
-length(Dfm_Test@Dimnames$features) 
-length(Prova@Dimnames$features)
-
-Review_test_1 <- corpus(Review_test_1)
-
 Dfm_Test <- dfm(tokens(Review_test_1,
-                         remove_punct = TRUE,
-                         remove_symbols = TRUE,
-                         remove_url = TRUE,
-                         remove_numbers = TRUE) %>%
-                    tokens_tolower() %>% 
-                    tokens_remove(c(stopwords("italian"))) %>%
-                    tokens_wordstem(language = "italian"))
+                       remove_punct = TRUE,
+                       remove_symbols = TRUE,
+                       remove_url = TRUE,
+                       remove_numbers = TRUE) %>%
+                  tokens_tolower() %>% 
+                  tokens_remove(c(stopwords("italian"))) %>%
+                  tokens_wordstem(language = "italian"))
+
+Dfm_Training <- dfm_trim(Dfm_Training,
+                         min_termfreq = 10,
+                         min_docfreq = 2)
+
+Dfm_Test <- dfm_trim(Dfm_Test,
+                     min_termfreq = 10,
+                     min_docfreq = 2)
+
+length(Dfm_Training@Dimnames$features) #61
+length(Dfm_Test@Dimnames$features) #867
 
 setequal(featnames(Dfm_Training), 
          featnames(Dfm_Test)) 
 
-Dfm_Training <- dfm_trim(Dfm_Totale,
-                       min_termfreq = 10,
-                       min_docfreq = 2)
 
-Dfm_Test <- dfm_trim(Dfm_Totale,
-                       min_termfreq = 10,
-                       min_docfreq = 2)
-Prova <- dfm_match(Dfm_Test, 
-                   features = featnames(Dfm_Training))
+Dfm_Test <- dfm_match(Dfm_Test, 
+                      features = featnames(Dfm_Training))
+# Dopo il match lunghezzze pari a 61
+
+Matrice_Training <- as.matrix(Dfm_Training)
+Matrice_Test <- as.matrix(Dfm_Test)
+
+str(Dfm_Training@docvars$Sentiment) #impostare le minuscole
+Dfm_Training@docvars$Sentiment <- as.factor(Dfm_Training@docvars$Sentiment)
 # Check list ----
 
 # Scrivere qui tutti gli step fatti e da fare
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
+
 
 # SUGGERIMENTI ----
 
