@@ -23,7 +23,8 @@ Ita_StoresReview <- StoresReview[StoresReview$lang_value == "it" | is.na(StoresR
 
 # Corpus con i testi NON vuoti
 Corpus_Totale <- corpus(na.omit(Ita_StoresReview$text))
-names(Corpus_Totale) <- 
+names(Corpus_Totale) <- Ita_StoresReview$ID[is.na(Ita_StoresReview$text) == FALSE]
+
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
@@ -74,34 +75,25 @@ set.seed(002)
 Training_tweet <- sample(Tweet_Corpus, size = 40, replace = FALSE)
 
 # TRAINING DATA
-Campione <- c(Training_tweet, Training_places)
+Training_data <- c(Training_tweet, Training_places)
 
 # Corpus per il TEST SET
-Review_test <- Corpus_Totale[!(Corpus_Totale %in% Campione)]
+Review_test <- Corpus_Totale[!(Corpus_Totale %in% Training_data)]
 
-#Co
+# Verifica complementare
 setequal(Corpus_Totale, union(Review_test, Campione))
 
-# Verifica Complementari
-setequal(Testo_Corpus, union(Review_test, Review_training))
-
-# Runnare da 71 a 82 per Riempire la lista
-Lavoro <- list(
-  William = rep("", 50),
-  Davide = rep("", 50),
-  Maddalena = rep("", 50),
-  Giacomo = rep("", 50)
+Campione <- data.frame(
+  ID <- names(Training_data),
+  Persona <- rep(c("William","Davide","Maddalena","Giacomo"),each = 50),
+  Testo <- Training_data,
+  Sentiment <- NA
 )
-k <- 0
 
-for (i in 1:4){
-  Lavoro[[i]] <- Review_training[(k+1) : (50 * i)]
-  k <- 50 * i
-}
-
+write_xlsx(Campione, "Lavoro.xlsx")
 
 # Semplice sequenza di codice per esportare / importare ed editare su excel  --------
-library(openxlsx)
+
 #Export
 df = data.frame(names(Lavoro$Davide), Lavoro$Davide, NA) # put your fucking name
 colnames(df) <- c('TextNumber', 'text', 'sentiment')
