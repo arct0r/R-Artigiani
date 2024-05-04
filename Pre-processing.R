@@ -1,5 +1,6 @@
 # librerie e dataset ----
 library(readxl)
+library(writexl)
 library(rstudioapi)
 library(quanteda)
 library(quanteda.textstats)
@@ -10,6 +11,7 @@ setwd(dirname(getActiveDocumentContext()$path))
 # è utile perchè, lavorando con git, cloniamo continuamente e non si può stare a cambiare ogni volta il path per ogni pc diverso
 
 StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
+StoresReview$ID <- seq(1:nrow(StoresReview))
 
 # Dataset con sole recensioni in italiano.
 Ita_StoresReview <- StoresReview[StoresReview$lang_value == "it" | is.na(StoresReview$lang_value) == TRUE,]
@@ -17,24 +19,15 @@ Ita_StoresReview <- StoresReview[StoresReview$lang_value == "it" | is.na(StoresR
 # PRE- PROCESSING DFM ----
 
 # Creazione del Corpus prendendo solo i testi NON vuoti
-Testo_Corpus <- corpus(na.omit(Ita_StoresReview$text))
+Corpus_Totale <- corpus(na.omit(Ita_StoresReview$text))
+
 
 # Check
-textstat_summary(Testo_Corpus)
+apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
 
-# DFM - VERSIONE 1: risultato 35 MILIONI
-Testo_dfm <- dfm(tokens(Testo_Corpus,
-                        remove_numbers = TRUE,
-                        remove_punct = TRUE,
-                        remove_symbols = TRUE) %>%
-                   tokens_tolower() %>% 
-                   tokens_remove(c(stopwords("italian"))) %>%
-                   tokens_wordstem(language = "italian"))
-
-# DFM - VERSIONE 2: risultato 32 MILIONI
 # NON PULISCE TUTTO. !!, emoji
-Testo_dfm <- dfm(tokens(Testo_Corpus,
+Dfm_Totale <- dfm(tokens(Corpus_Totale,
                         remove_punct = TRUE,
                         remove_symbols = TRUE,
                         remove_url = TRUE,
@@ -43,15 +36,15 @@ Testo_dfm <- dfm(tokens(Testo_Corpus,
                    tokens_remove(c(stopwords("italian"))) %>%
                    tokens_wordstem(language = "italian"))
 # Check
-summary(Testo_dfm)
+summary(Dfm_Totale)
 
 # Applicazione del TRIMMING: condizioni TEMPORANEE.
-Testo_finito <- dfm_trim(Testo_dfm,
+DFM_Totale_Finito <- dfm_trim(Dfm_Totale,
                         min_termfreq = 10,
                         #max_termfreq = 500,
                         min_docfreq = 2)
 
-topfeatures(Testo_finito,100)
+topfeatures(DFM_Totale_Finito,100)
 
 
 # ANALISI ----
@@ -59,10 +52,33 @@ topfeatures(Testo_finito,100)
 # Per grafici sulle keywords
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 
-#Campionamento per il TRAINING STAGE
-set.seed(000)
-Review_training <- sample(Testo_Corpus, size = 200, replace = FALSE)
+Tweet_ita <- Ita_StoresReview[Ita_StoresReview$social == "twitter",]
+Places_ita <- Ita_StoresReview[Ita_StoresReview$social == "places",]
+Places_ita <- Places_ita[is.na(Places_ita$text) == FALSE,]
 
+apply(Tweet_ita, 2, function(x) sum(is.na(x)))
+apply(Places_ita, 2, function(x) sum(is.na(x)))
+
+
+
+ 
+Tweet_Stores <- Ita_StoresReview[Ita_StoresReview$social == "twitter",]
+Places_Stores <- Ita_StoresReview[Ita_StoresReview$social == "places",]
+
+#Campionamento per il TRAINING STAGE
+Tweet_Corpus <- corpus(Tweet_ita)
+names(Tweet_Corpus) <- Tweet_ita$ID
+
+Places_Corpus <- corpus(Places_ita)
+names(Places_Corpus) <- Places_ita$ID 
+
+set.seed(001)
+Training_places <- sample(Places_ita$text, size = 160, replace = FALSE)
+
+
+
+set.seed(002)
+Training_tweet <- sample(Tweet_ita, size = 40, replace = FALSE)
 # Corpus per il TEST SET
 Review_test <- Testo_Corpus[!(Testo_Corpus %in% Review_training)]
 
