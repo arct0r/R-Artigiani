@@ -96,8 +96,6 @@ write.xlsx(df, "davidino.xlsx") # put your fucking name
 df <- as.data.frame(read_excel("davidino.xlsx")) # put your fucking name
 # E così importate automaticamente il vostro lavoro fatto come un dataframe. 
 
-#Ciao
-
 
 # Check list ----
 
