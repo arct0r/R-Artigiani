@@ -1,4 +1,5 @@
 # 1: Pulizia e Preparazione dei dati ----
+install.packages("wordcloud")
 library(readxl)
 library(writexl)
 library(rstudioapi)
@@ -15,7 +16,8 @@ library(cvTools)
 library(caret)
 library(ggplot2)
 library(gridExtra)
-
+library(tm)
+library(wordcloud)
 
 
 # Directory della cartella condivisa
@@ -32,14 +34,15 @@ Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
 
 # PRE- PROCESSING DFM ----
 
-# Corpus con i testi NON vuoti
+# Corpus
 Corpus_Totale <- corpus(Ita_StoresReview)
+# Modo per ottenere gli ID
 attr(Corpus_Totale, "docvars")$ID
 
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
-# NON PULISCE TUTTO. !!, emoji
+# DFM... MODIFICARE LE CONDIZIONI TRIMMING
 Dfm_Totale <- dfm(tokens(Corpus_Totale,
                         remove_punct = TRUE,
                         remove_symbols = TRUE,
@@ -49,20 +52,55 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
                    tokens_remove(c(stopwords("italian"))) %>%
                    tokens_wordstem(language = "italian")) %>%
               dfm_trim(min_termfreq = 10,
-                       min_docfreq = 2) # modificare le condizioni
+                       max_termfreq = 500,
+                       min_docfreq = 2)
 
 #FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
 # Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
 # QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
 
+# Toglie i tag e gli hashtag
+Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))]
+Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
+
+# Modo per ottenere gli ID
 Dfm_Totale@docvars$ID
 # Lunghezza del DFM
 summary(Dfm_Totale)
+
+# RILEVAZIONE DELLE KEYWORDS
+
 # Top parole del DFM
 topfeatures(Dfm_Totale,300)
 
+Parole_Popolari <- textstat_frequency(Dfm_Totale, n =20)
+Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
-# ANALISI ----
+ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
+  geom_point(size = 1.5, color = "Darkorange2") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=360, hjust=1)) +
+  labs(x = "Features", y = "Frequenza", 
+       title = "Le 20 parole più frequenti nelle recensioni") +
+  theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
+        plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
+
+textplot_wordcloud(Dfm_Totale, 
+                   min_size = 1.5,
+                   max_size = 4,
+                   min.count = 10,
+                   max_words = 50,
+                   random.order = FALSE,
+                   random_color = FALSE,
+                   rotation = 0,
+                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+wordcloud(colnames(Dfm_Totale),
+          min.freq = 10,
+          random.order = FALSE,
+          random.color = FALSE,
+          max.words = 50)
+# Creare il grafico apposito nella scelta delle keywords per vedere in quali recensioni appaiono
+
 # Suddivisione dataset per social
 Tweet_ita <- Ita_StoresReview[Ita_StoresReview$social == "twitter",]
 Places_ita <- Ita_StoresReview[Ita_StoresReview$social == "places",]
