@@ -1,12 +1,20 @@
 # 1: Pulizia e Preparazione dei dati ----
-install.packages("naivebayes")
 library(readxl)
 library(writexl)
 library(rstudioapi)
 library(quanteda)
 library(quanteda.textstats)
 library(naivebayes)
+library(randomForest)
+library(iml)
+library(future)
+library(future.callr)
+library(e1071)
+library(reshape2)
+library(cvTools)
+library(caret)
 library(ggplot2)
+library(gridExtra)
 
 
 
@@ -41,13 +49,17 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
                    tokens_remove(c(stopwords("italian"))) %>%
                    tokens_wordstem(language = "italian")) %>%
               dfm_trim(min_termfreq = 10,
-                       min_docfreq = 2)
+                       min_docfreq = 2) # modificare le condizioni
+
+#FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
+# Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
+# QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
 
 Dfm_Totale@docvars$ID
 # Lunghezza del DFM
 summary(Dfm_Totale)
 # Top parole del DFM
-topfeatures(Dfm_Totale,100)
+topfeatures(Dfm_Totale,300)
 
 
 # ANALISI ----
@@ -102,7 +114,7 @@ Test_data <- data.frame(
 names(Test_data) <- c("ID","text")
 
 #Esportare il Campione
-write_xlsx(Campione, "Training Data Grezzo.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
+#write_xlsx(Campione, "Training Data Grezzo.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
 Campione <- read_excel("Training Data Grezzo.xlsx")
 
 Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo", 
@@ -168,12 +180,288 @@ summary(NaiveBayesModel)
 
 Test_predictedNB <- predict(NaiveBayesModel,
                             Matrice_Test)
+
+set.seed(150)
+system.time(RF <- randomForest(y= Dfm_Training@docvars$sentiment, 
+                               x= Matrice_Training, 
+                               importance=TRUE,  
+                               do.trace=FALSE, 
+                               ntree=500))
+RF$predicted
+
+RF
+table(Campione$sentiment)
+set.seed(175)
+
+plot(RF, type = "l", col = c("black", "steelblue4","violetred4", "springgreen4"),
+     main = "Random Forest Model Errors: sentiment variable")
+legend("topright", horiz = F, cex = 0.7,
+       fill = c("springgreen4", "black", "steelblue4", "violetred4"),
+       c("Positive error", "Average error", "Negative error", "Neutral error"))
+
+system.time(SupportVectorMachine <- svm(
+  y= Dfm_Training@docvars$sentiment,
+  x=Matrice_Training, kernel='linear', cost = 1))
+
+Errori <- as.data.frame(RF$err.rate)
+
+which.min(Errori$OOB) # 96
+
+set.seed(150)
+system.time(RF <- randomForest(y= Dfm_Training@docvars$sentiment, 
+                               x= Matrice_Training, 
+                               importance=TRUE,  
+                               do.trace=FALSE, 
+                               ntree=53))
+
+system.time(Test_predictedRF <- predict(RF,
+                                        Matrice_Test ,type="class"))
+
+length(SupportVectorMachine$index)
+
+system.time(Test_predictedSV <- predict(SupportVectorMachine, 
+                                        Matrice_Test))
+Test_predictedSV
 # Check list ----
-str(Test_predictedNB)
 # Scrivere qui tutti gli step fatti e da fare
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 
+Test_data$Bayes <- Test_predictedNB
+Test_data$Forest <- Test_predictedRF
+Test_data$Support <- Test_predictedSV
 
+results <- as.data.frame(rbind(prop.table(table(Test_predictedNB)),
+                               prop.table(table(Test_predictedRF)),
+                               prop.table(table(Test_predictedSV))))
+
+results$algorithm <- c("Naive Bayes", "Random Forest", "Support Vector Machine")
+
+df.long<-melt(results,id.vars=c("algorithm"))
+str(df.long)
+
+ggplot(df.long,aes(algorithm,value,fill=variable))+
+  geom_bar(position="dodge",stat="identity") + scale_fill_manual(values = c("violetred3", "yellow3", "orange2")) +
+  labs(title = "Comparazione delle predizioni") +
+  theme(axis.text.x = element_text(color="#993333", angle=90)) + coord_flip() +
+  ylab(label="Proporzione delle categorie nel test set") + xlab("Algoritmi") +
+  guides(fill=guide_legend(title="Categorie di \nsentiment")) +
+  theme(plot.title = element_text(color = "black", size = 12, face = "plain"),
+        axis.title=element_text(size=11,face="plain"),
+        axis.text= element_text(size =10, face = "italic")
+  )
+
+Matrice_Training2 <- Matrice_Training
+
+#Assicuiamo la replicabilità 
+set.seed(200)
+#Definiamo un oggetto k che indichi il numero di folders
+k <- 5
+#Dividiamo la matrice in k folders
+folds <- cvFolds(NROW(Matrice_Training2), K = k)
+
+system.time(for(i in 1:k){
+  Matrice_Training <-
+    Matrice_Training2 [folds$subsets[folds$which != i], ]
+  ValidationSet <-
+    Matrice_Training2 [folds$subsets[folds$which == i], ]
+  set.seed(200)
+  NaiveBayesModel <- multinomial_naive_bayes(
+    y= Dfm_Training[folds$subsets[folds$which != i], ]
+    @docvars$sentiment ,
+    x=Matrice_Training, laplace = 1)
+  Predictions_NB <- predict(NaiveBayesModel, 
+                            newdata = ValidationSet, 
+                            type = "class")
+  class_table <- table("Predictions"= Predictions_NB,
+                       
+                       "Actual"=Dfm_Training[folds$subsets[folds$which == i], ]@docvars$sentiment)
+  
+  print(class_table)
+  df<-confusionMatrix( class_table, mode = "everything")
+  df_measures_NB<-paste0("conf.mat.nb",i)
+  assign(df_measures_NB,df)
+})
+
+NB_Prediction <- data.frame(col1=vector(), col2=vector(), col3=vector(), col4=vector())
+
+#Riempiamo il dataset con i valori di accuracy e f1 
+for(i in mget(ls(pattern = "conf.mat.nb")) ) {
+  Accuracy <-(i)$overall[1]
+  p <- as.data.frame((i)$byClass)
+  F1_negative <- p$F1[1]
+  F1_neutral <- p$F1[2]
+  F1_positive <- p$F1[3]
+  NB_Prediction <- rbind(NB_Prediction , cbind(Accuracy , F1_negative ,
+                                               F1_neutral, F1_positive ))
+  
+}
+
+#guardiamo la struttura 
+str(NB_Prediction)
+NB_Prediction [is.na(NB_Prediction )] <- 0
+
+AverageAccuracy_NB <- mean(NB_Prediction[, 1] )
+AverageF1_NB<- mean(colMeans(NB_Prediction[-1] ))
+AverageAccuracy_NB
+AverageF1_NB
+
+# RANDOM FOREST
+system.time(for(i in 1:k){
+  Matrice_Training <-
+    Matrice_Training2 [folds$subsets[folds$which != i], ]
+  ValidationSet <-
+    Matrice_Training2 [folds$subsets[folds$which == i], ]
+  set.seed(250)
+  RandomForest <- randomForest(
+    y= Dfm_Training[folds$subsets[folds$which != i], ]
+    @docvars$sentiment ,
+    x=Matrice_Training, do.trace=FALSE, ntree=53)
+  Predictions_RF <- predict(RandomForest, 
+                            newdata= ValidationSet, 
+                            type="class")
+  class_table <- table("Predictions"= Predictions_RF,
+                       "Actual"=Dfm_Training[folds$subsets[folds$which == i], ]@docvars$sentiment)
+  print(class_table)
+  df<-confusionMatrix( class_table, mode = "everything")
+  df_measures_RF<-paste0("conf.mat.rf",i)
+  assign(df_measures_RF,df)
+})
+
+RF_Predictions <- data.frame(col1=vector(), col2=vector(), col3=vector(), col4 = vector())
+
+
+for(i in mget(ls(pattern = "conf.mat.rf")) ) {
+  Accuracy <-(i)$overall[1]
+  p <- as.data.frame((i)$byClass)
+  F1_negative <- p$F1[1]
+  F1_neutral <- p$F1[2]
+  F1_positive <- p$F1[3]
+  RF_Predictions <- rbind(RF_Predictions , cbind(Accuracy , F1_negative ,
+                                                 F1_neutral, F1_positive ))
+  
+}
+
+str(RF_Predictions)
+
+RF_Predictions [is.na(RF_Predictions )] <- 0
+
+#Calcoliamo i valori medi
+AverageAccuracy_RF <- mean(RF_Predictions[, 1] )
+AverageF1_RF<- mean(colMeans(RF_Predictions[-1] ))
+
+AverageAccuracy_RF
+AverageF1_RF
+
+
+# SUPPORT VECTOR MACHINE
+
+system.time(for(i in 1:k){
+  Matrice_Training <-
+    Matrice_Training2 [folds$subsets[folds$which != i], ]
+  ValidationSet <-
+    Matrice_Training2 [folds$subsets[folds$which == i], ]
+  set.seed(300)
+  SupportVectorMachine<- svm(
+    y= Dfm_Training[folds$subsets[folds$which != i], ]
+    @docvars$sentiment, 
+    x=Matrice_Training, kernel='linear', cost = 1)
+  Prediction_SVM <- predict(SupportVectorMachine,
+                            newdata=ValidationSet)
+  class_table <- table("Predictions"= Prediction_SVM,
+                       "Actual"=Dfm_Training[folds$subsets[folds$which == i], ]@docvars$sentiment)
+  print(class_table)
+  df<-confusionMatrix( class_table, mode = "everything")
+  df_measures_SVM<-paste0("conf.mat.sv",i)
+  assign(df_measures_SVM,df)
+})
+
+
+SVM_Prediction <- data.frame(col1=vector(), col2=vector(), col3=vector(), col4=vector())
+
+#Riempiamo il dataframe 
+for(i in mget(ls(pattern = "conf.mat.sv")) ) {
+  Accuracy <-(i)$overall[1]
+  p <- as.data.frame((i)$byClass)
+  F1_negative <- p$F1[1]
+  F1_neutral <- p$F1[2]
+  F1_positive <- p$F1[3]
+  SVM_Prediction <- rbind(SVM_Prediction , cbind(Accuracy , F1_negative ,
+                                                 F1_neutral, F1_positive ))
+  
+}
+
+str(SVM_Prediction)
+SVM_Prediction [is.na(SVM_Prediction)] <- 0
+
+
+#Calcoliamo i valori medi
+AverageAccuracy_SVM <- mean(SVM_Prediction[, 1] )
+AverageF1_SVM<- mean(colMeans(SVM_Prediction[-1] ))
+
+AverageAccuracy_SVM
+AverageF1_SVM
+
+
+# CONFRONTO
+AccNB <- as.data.frame(AverageAccuracy_NB )
+colnames(AccNB)[1] <- "NB"
+
+#Creo un dataframe per RF
+AccRF <- as.data.frame(AverageAccuracy_RF )
+#Rinomino la colonna
+colnames(AccRF)[1] <- "RF"
+
+#Creo un dataframe per SVM
+AccSVM<- as.data.frame(AverageAccuracy_SVM )
+#Rinomino la colonna
+colnames(AccSVM)[1] <- "SVM"
+
+#Unisco in un unico dataframe i valori di accuracy dei tre modelli
+Accuracy_models <- cbind(AccNB, AccRF, AccSVM)
+Accuracy_models
+
+Accuracy_models_Melt <-melt(Accuracy_models)
+str(Accuracy_models_Melt)
+
+plot_accuracy <- ggplot(Accuracy_models_Melt, aes(x=variable, y=value, color = variable)) +
+  geom_boxplot() + xlab("Algorithm") + ylab(label="Values of accuracy") +
+  labs(title = "Cross-validation with k =5: values of accuracy") + coord_flip() +
+  theme_bw() +
+  guides(color=guide_legend(title="Algorithms")) +
+  theme(plot.title = element_text(color = "black", size = 12, face = "italic"),
+        axis.title.x =element_text(size=12,face="bold"),
+        axis.title.y =element_text(size=12, face = "plain"),
+        axis.text= element_text(size =10, face = "italic")
+  )
+
+F1NB <- as.data.frame(AverageF1_NB)
+colnames(F1NB)[1] <- "NB"
+#RF
+F1RF<- as.data.frame(AverageF1_RF )
+colnames(F1RF)[1] <- "RF"
+#SVM
+F1SVM <- as.data.frame(AverageF1_SVM)
+colnames(F1SVM)[1] <- "SVM"
+#DATAFRAME
+f1_models <- cbind(F1NB, F1RF, F1SVM)
+f1_models
+
+f1_models_melt <-melt(f1_models)
+str(f1_models_melt)
+
+plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
+  geom_boxplot() + xlab("Algorithm") + ylab(label="Values of f1") +
+  labs(title = "Cross-validation with k =5: values of f1") + coord_flip() +
+  theme_bw() +
+  guides(color=guide_legend(title="Algorithms")) +
+  theme(plot.title = element_text(color = "black", size = 12, face = "italic"),
+        axis.title.x =element_text(size=12,face="bold"),
+        axis.title.y =element_text(size=12, face = "plain"),
+        axis.text= element_text(size =10, face = "italic")
+  )
+
+grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
+# Estrarre un campione di 150 e calcolare la % di uguaglianza
 
 # SUGGERIMENTI ----
 
