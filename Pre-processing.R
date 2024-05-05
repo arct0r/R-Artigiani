@@ -1,10 +1,11 @@
 # 1: Pulizia e Preparazione dei dati ----
-
+install.packages("naivebayes")
 library(readxl)
 library(writexl)
 library(rstudioapi)
 library(quanteda)
 library(quanteda.textstats)
+library(naivebayes)
 library(ggplot2)
 
 
@@ -114,7 +115,7 @@ apply(Campione, 2, function(x) sum(is.na(x)))
 
 str(Training_data)
 Training_data <- corpus(Campione)
-Test_data <- corpus(Test_data)
+Test_Corpus <- corpus(Test_data)
 
 
 Dfm_Training <- dfm(tokens(Training_data,
@@ -128,7 +129,7 @@ Dfm_Training <- dfm(tokens(Training_data,
                 dfm_trim(min_termfreq = 10,
                          min_docfreq = 2)
 
-Dfm_Test <- dfm(tokens(Test_data,
+Dfm_Test <- dfm(tokens(Test_Corpus,
                            remove_punct = TRUE,
                            remove_symbols = TRUE,
                            remove_url = TRUE,
@@ -153,12 +154,25 @@ setequal(featnames(Dfm_Training),
 Matrice_Training <- as.matrix(Dfm_Training)
 Matrice_Test <- as.matrix(Dfm_Test)
 
+
 str(Dfm_Training@docvars$sentiment)
 Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
-# Check list ----
 
+set.seed(123) 
+
+system.time(NaiveBayesModel <- multinomial_naive_bayes
+            (x=Matrice_Training,
+              y=Dfm_Training@docvars$sentiment,
+              laplace = 1))
+summary(NaiveBayesModel)
+
+Test_predictedNB <- predict(NaiveBayesModel,
+                            Matrice_Test)
+# Check list ----
+str(Test_predictedNB)
 # Scrivere qui tutti gli step fatti e da fare
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
+
 
 
 # SUGGERIMENTI ----
