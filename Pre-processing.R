@@ -1,10 +1,14 @@
-# 1: Pulizia e Preparazione dei dati ----
-install.packages("wordcloud")
+# LIBRERIE ----
+
+# Dataset
 library(readxl)
 library(writexl)
+# Directory
 library(rstudioapi)
+# Pre-processing
 library(quanteda)
 library(quanteda.textstats)
+# Algoritmi
 library(naivebayes)
 library(randomForest)
 library(iml)
@@ -14,101 +18,30 @@ library(e1071)
 library(reshape2)
 library(cvTools)
 library(caret)
+# Grafici
 library(ggplot2)
 library(gridExtra)
 library(tm)
 library(wordcloud)
 
-
+# 1: DATASET E PULIZIA ----
 # Directory della cartella condivisa
 setwd(dirname(getActiveDocumentContext()$path))
 # Dataset
 StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
 # Aggiunta Primary key
 StoresReview$ID <- seq(1:nrow(StoresReview))
-# Dataset con sole recensioni in italiano.
+# Dataset con recensioni in italiano e non vuote.
 Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
                                     is.na(StoresReview$lang_value) == TRUE) & 
                                    is.na(StoresReview$text) == FALSE,]
 
-
-# PRE- PROCESSING DFM ----
-
-# Corpus
-Corpus_Totale <- corpus(Ita_StoresReview)
-# Modo per ottenere gli ID
-attr(Corpus_Totale, "docvars")$ID
-
-# Frequenze delle caratteristiche del Corpus
-apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
-
-# DFM... MODIFICARE LE CONDIZIONI TRIMMING
-Dfm_Totale <- dfm(tokens(Corpus_Totale,
-                        remove_punct = TRUE,
-                        remove_symbols = TRUE,
-                        remove_url = TRUE,
-                        remove_numbers = TRUE) %>%
-                   tokens_tolower() %>% 
-                   tokens_remove(c(stopwords("italian"))) %>%
-                   tokens_wordstem(language = "italian")) %>%
-              dfm_trim(min_termfreq = 10,
-                       max_termfreq = 500,
-                       min_docfreq = 2)
-
-#FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
-# Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
-# QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
-
-# Toglie i tag e gli hashtag
-Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))]
-Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
-
-# Modo per ottenere gli ID
-Dfm_Totale@docvars$ID
-# Lunghezza del DFM
-summary(Dfm_Totale)
-
-# RILEVAZIONE DELLE KEYWORDS
-
-# Top parole del DFM
-topfeatures(Dfm_Totale,300)
-
-Parole_Popolari <- textstat_frequency(Dfm_Totale, n =20)
-Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
-
-ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
-  geom_point(size = 1.5, color = "Darkorange2") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=360, hjust=1)) +
-  labs(x = "Features", y = "Frequenza", 
-       title = "Le 20 parole più frequenti nelle recensioni") +
-  theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
-        plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
-
-textplot_wordcloud(Dfm_Totale, 
-                   min_size = 1.5,
-                   max_size = 4,
-                   min.count = 10,
-                   max_words = 50,
-                   random.order = FALSE,
-                   random_color = FALSE,
-                   rotation = 0,
-                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
-wordcloud(colnames(Dfm_Totale),
-          min.freq = 10,
-          random.order = FALSE,
-          random.color = FALSE,
-          max.words = 50)
-# Creare il grafico apposito nella scelta delle keywords per vedere in quali recensioni appaiono
-
-# Suddivisione dataset per social
 Tweet_ita <- Ita_StoresReview[Ita_StoresReview$social == "twitter",]
 Places_ita <- Ita_StoresReview[Ita_StoresReview$social == "places",]
-# Controllo testi vuoti
+
 apply(Tweet_ita, 2, function(x) sum(is.na(x))) # 0 testi NA
 apply(Places_ita, 2, function(x) sum(is.na(x))) # 458 testi NA!!
 
-# Corpus per i Tweet
 Tweet_Corpus <- corpus(Tweet_ita)
 
 # Foreign key impostate
@@ -118,13 +51,14 @@ Places_Corpus <- corpus(Places_ita)
 # Foreign key impostate
 attr(Places_Corpus, "docvars")$ID
 
+# 2: ANALISI DEL SENTIMENT CON GLI ALGORITMI ----
+
 # Campionamento con numerosità 200
 set.seed(001)
 Training_places <- sample(Places_Corpus, size = 160, replace = FALSE)
 set.seed(002)
 Training_tweet <- sample(Tweet_Corpus, size = 40, replace = FALSE)
 
-attr(Training_tweet, "docvars")$ID
 # TRAINING DATA
 
 docnames(Training_tweet) <- paste0("new_", docnames(Training_tweet))
@@ -156,8 +90,8 @@ names(Test_data) <- c("ID","text")
 Campione <- read_excel("Training Data Grezzo.xlsx")
 
 Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo", 
-                                  ifelse(Campione$sentiment == 0, "Neutro", 
-                                        "Positivo"))
+                             ifelse(Campione$sentiment == 0, "Neutro", 
+                                    "Positivo"))
 
 # Verifica celle vuote.
 apply(Campione, 2, function(x) sum(is.na(x)))
@@ -169,17 +103,6 @@ Test_Corpus <- corpus(Test_data)
 
 
 Dfm_Training <- dfm(tokens(Training_data,
-                         remove_punct = TRUE,
-                         remove_symbols = TRUE,
-                         remove_url = TRUE,
-                         remove_numbers = TRUE) %>%
-                    tokens_tolower() %>% 
-                    tokens_remove(c(stopwords("italian"))) %>%
-                    tokens_wordstem(language = "italian")) %>%
-                dfm_trim(min_termfreq = 10,
-                         min_docfreq = 2)
-
-Dfm_Test <- dfm(tokens(Test_Corpus,
                            remove_punct = TRUE,
                            remove_symbols = TRUE,
                            remove_url = TRUE,
@@ -187,8 +110,19 @@ Dfm_Test <- dfm(tokens(Test_Corpus,
                       tokens_tolower() %>% 
                       tokens_remove(c(stopwords("italian"))) %>%
                       tokens_wordstem(language = "italian")) %>%
-                dfm_trim(min_termfreq = 10,
-                         min_docfreq = 2)
+  dfm_trim(min_termfreq = 10,
+           min_docfreq = 2)
+
+Dfm_Test <- dfm(tokens(Test_Corpus,
+                       remove_punct = TRUE,
+                       remove_symbols = TRUE,
+                       remove_url = TRUE,
+                       remove_numbers = TRUE) %>%
+                  tokens_tolower() %>% 
+                  tokens_remove(c(stopwords("italian"))) %>%
+                  tokens_wordstem(language = "italian")) %>%
+  dfm_trim(min_termfreq = 10,
+           min_docfreq = 2)
 
 length(Dfm_Training@Dimnames$features) #61
 length(Dfm_Test@Dimnames$features) #867
@@ -204,16 +138,15 @@ setequal(featnames(Dfm_Training),
 Matrice_Training <- as.matrix(Dfm_Training)
 Matrice_Test <- as.matrix(Dfm_Test)
 
-
+Matrice_Training
 str(Dfm_Training@docvars$sentiment)
 Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
 
 set.seed(123) 
 
-system.time(NaiveBayesModel <- multinomial_naive_bayes
-            (x=Matrice_Training,
-              y=Dfm_Training@docvars$sentiment,
-              laplace = 1))
+NaiveBayesModel <- multinomial_naive_bayes(x=Matrice_Training,
+                                           y=Dfm_Training@docvars$sentiment,
+                                           laplace = 1)
 summary(NaiveBayesModel)
 
 Test_predictedNB <- predict(NaiveBayesModel,
@@ -260,7 +193,7 @@ length(SupportVectorMachine$index)
 system.time(Test_predictedSV <- predict(SupportVectorMachine, 
                                         Matrice_Test))
 Test_predictedSV
-# Check list ----
+
 # Scrivere qui tutti gli step fatti e da fare
 Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 
@@ -499,12 +432,74 @@ plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
   )
 
 grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
+# 3: DRIVER ANALYSIS ----
+
+# Corpus
+Corpus_Totale <- corpus(Ita_StoresReview)
+# Modo per ottenere gli ID
+attr(Corpus_Totale, "docvars")$ID
+
+# Frequenze delle caratteristiche del Corpus
+apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
+
+# DFM... MODIFICARE LE CONDIZIONI TRIMMING
+Dfm_Totale <- dfm(tokens(Corpus_Totale,
+                        remove_punct = TRUE,
+                        remove_symbols = TRUE,
+                        remove_url = TRUE,
+                        remove_numbers = TRUE) %>%
+                   tokens_tolower() %>% 
+                   tokens_remove(c(stopwords("italian"))) %>%
+                   tokens_wordstem(language = "italian")) %>%
+              dfm_trim(min_termfreq = 10,
+                       max_termfreq = 500,
+                       min_docfreq = 2)
+
+#FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
+# Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
+# QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
+
+# Toglie i tag e gli hashtag
+Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))]
+Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
+
+# Modo per ottenere gli ID
+Dfm_Totale@docvars$ID
+# Lunghezza del DFM
+summary(Dfm_Totale)
+
+# RILEVAZIONE DELLE KEYWORDS
+
+# Top parole del DFM
+topfeatures(Dfm_Totale,300)
+
+Parole_Popolari <- textstat_frequency(Dfm_Totale, n =20)
+Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
+
+ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
+  geom_point(size = 1.5, color = "Darkorange2") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=360, hjust=1)) +
+  labs(x = "Features", y = "Frequenza", 
+       title = "Le 20 parole più frequenti nelle recensioni") +
+  theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
+        plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
+
+textplot_wordcloud(Dfm_Totale, 
+                   min_size = 1.5,
+                   max_size = 4,
+                   min.count = 10,
+                   max_words = 50,
+                   random.order = FALSE,
+                   random_color = FALSE,
+                   rotation = 0,
+                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+wordcloud(colnames(Dfm_Totale),
+          min.freq = 10,
+          random.order = FALSE,
+          random.color = FALSE,
+          max.words = 50)
+# Creare il grafico apposito nella scelta delle keywords per vedere in quali recensioni appaiono
+
 # Estrarre un campione di 150 e calcolare la % di uguaglianza
 
-# SUGGERIMENTI ----
-
-# allenamento dell'algoritmo.
-# estrazione campionaria randomica
-# 200 testi a testa
-# codebook, documento word per noi
-# driver serve il dizionario (normale o newsmap).
