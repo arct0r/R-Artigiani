@@ -21,8 +21,7 @@ library(caret)
 # Grafici
 library(ggplot2)
 library(gridExtra)
-library(tm)
-library(wordcloud)
+library(quanteda.textplots)
 
 # 1: DATASET E PULIZIA ----
 # Directory della cartella condivisa
@@ -35,7 +34,8 @@ StoresReview$ID <- seq(1:nrow(StoresReview))
 Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
                                     is.na(StoresReview$lang_value) == TRUE) & 
                                    is.na(StoresReview$text) == FALSE,]
-
+# Suddivido il dataset tra twitter e places
+# Visto che abbiamo notato un'importante differenza di qualità delle recensioni
 Tweet_ita <- Ita_StoresReview[Ita_StoresReview$social == "twitter",]
 Places_ita <- Ita_StoresReview[Ita_StoresReview$social == "places",]
 
@@ -43,13 +43,9 @@ apply(Tweet_ita, 2, function(x) sum(is.na(x))) # 0 testi NA
 apply(Places_ita, 2, function(x) sum(is.na(x))) # 458 testi NA!!
 
 Tweet_Corpus <- corpus(Tweet_ita)
-
-# Foreign key impostate
-attr(Tweet_Corpus, "docvars")$ID
-# Corpus per i Places
 Places_Corpus <- corpus(Places_ita)
-# Foreign key impostate
-attr(Places_Corpus, "docvars")$ID
+
+
 
 # 2: ANALISI DEL SENTIMENT CON GLI ALGORITMI ----
 
@@ -436,6 +432,7 @@ grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
 
 # Corpus
 Corpus_Totale <- corpus(Ita_StoresReview)
+str(Corpus_Totale)
 # Modo per ottenere gli ID
 attr(Corpus_Totale, "docvars")$ID
 
@@ -455,6 +452,20 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
                        max_termfreq = 500,
                        min_docfreq = 2)
 
+Dfm_Places <- dfm(tokens(Places_Corpus,
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_url = TRUE,
+                         remove_numbers = TRUE) %>%
+                    tokens_tolower() %>% 
+                    tokens_remove(c(stopwords("italian"))) %>%
+                    tokens_wordstem(language = "italian")) %>%
+  dfm_trim(min_termfreq = 10,
+           max_termfreq = 500,
+           min_docfreq = 2)
+  
+dim(Dfm_Places)
+
 #FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
 # Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
 # QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
@@ -471,9 +482,9 @@ summary(Dfm_Totale)
 # RILEVAZIONE DELLE KEYWORDS
 
 # Top parole del DFM
-topfeatures(Dfm_Totale,300)
+topfeatures(Dfm_Totale,50)
 
-Parole_Popolari <- textstat_frequency(Dfm_Totale, n =20)
+Parole_Popolari <- textstat_frequency(Dfm_Totale, n =50)
 Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
 ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
@@ -486,19 +497,28 @@ ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
         plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
 
 textplot_wordcloud(Dfm_Totale, 
-                   min_size = 1.5,
-                   max_size = 4,
-                   min.count = 10,
-                   max_words = 50,
-                   random.order = FALSE,
+                   min_size = 1.5,  
+                   max_size = 12,    
+                   min.count = 10,   
+                   max_words = 50,  
+                   random.order = FALSE,  
                    random_color = FALSE,
-                   rotation = 0,
+                   rotation = 0,    #rotazione delle parole
                    colors = RColorBrewer::brewer.pal(8,"Dark2"))
-wordcloud(colnames(Dfm_Totale),
-          min.freq = 10,
-          random.order = FALSE,
-          random.color = FALSE,
-          max.words = 50)
+                   
+Driver <- dictionary(list(Prezzo = c("offert*","scont*","prezz*","vend*","cost*","sottocost*", "economic*"),
+                          Servizio = c("personal*","serviz*","gentil*","professional*","competent*","aiut*","cortes*","assistent*","disponibil*","cordial*",
+                                       "scortes*","male*","lent*","disorg*","disorie*"),
+                          Ordini = c("ordin*","consegn*","ritir*","garanz*","online*","spedi*","reso","account"),
+                          Location = c("negoz*","post*","parchegg*","affollat*","piccol*","disord*")))
+
+Driver_Review <- dfm_lookup(Dfm_Totale,Driver)
+Driver_Review
+
+Driver_Conv_Rev <- convert(Driver_Review, to = "data.frame")
+
+apply(Driver_Conv_Rev[,2:5],2,sum)
+prop.table(apply(Driver_Conv_Rev[,2:5],2,sum)) # da sistemare
 # Creare il grafico apposito nella scelta delle keywords per vedere in quali recensioni appaiono
 
 # Estrarre un campione di 150 e calcolare la % di uguaglianza
