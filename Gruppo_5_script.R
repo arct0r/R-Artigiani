@@ -8,6 +8,9 @@ library(rstudioapi)
 library(quanteda)
 library(quanteda.textstats)
 library(SnowballC)
+# Driver Analysis
+library(dplyr)
+library(syuzhet)
 # Algoritmi
 library(naivebayes)
 library(randomForest)
@@ -508,23 +511,34 @@ textplot_wordcloud(Dfm_Places,
 Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
                                      "economico", "concorrenziali", "sconto", 
                                      "offerta", "budget", "ragionevole","costo", "sostenibile", 
-                                     "convenienti", "sottocosto"),
+                                     "convenienti", "sottocosto", "eccezional", "super", "miglior", "ben", 
+                                     "top", "futur", "offert", "convenient", "risparm", "assurd", "super", "pazzesc", "gratis"),
                           servizio =  c("rapidità", "Empatia", "professionale", "supporto", 
                                         "risoluzione","problemi",  "cordialità", "assistenza", "vendita", 
                                         "immediata", "efficienza", "cortese", "reclami", 
                                         "competenza", "cliente", "flessibilità", "tempestività", 
                                         "servizio", "accoglienza", "caloroso", "gentile", "personal", "competente", "disponibile", "male",
-                                        "lento", "disorganizzato", "disordinato", "scortese", "cafone", "garanzia", "reso", "account"),
+                                        "lento", "disorganizzato", "disordinato", "scortese", "cafone", "garanzia", "reso", "account",
+                                        "signor", "reparto", "richiest", "graz", "eccezional", "inform", "miglior", "ragazz",
+                                        "rispost", "gent", "gentilissim", "rispett", "competent", "bell", "ringraz", "aiut",
+                                        "pront", "addett", "pessim", "pazienz", "ore", "benissim", "purtropp", "purtropp", "problem",
+                                        "incompetent", "rivolg", "compl", "ben", "consigl", "prossim", "buon", "gentilezz", "educ",
+                                        "simpat", "dispon", "attenzion", "qualif", "aspett", "grandissim", "disponibil", "esigent", "top",
+                                        "giovan", "assist", "futur", "risolt", "bravissim", "commess", "brav", "spieg", "dubb", "vergogn",
+                                        "inutil", "maleduc", "pochissim", "signorin", "bellissim", "perfett", "attent", "super",
+                                        "pazzesc", "soluzion", "difett", "truff", "qualit", "normal", "scortes", "intelligent"),
                           ordini = c("transazione", "acquisto", "pagamento", "tempo", "consegna", 
                                      "ordine", "opzioni", "modalità", "ritiro", 
                                      "rimborso", "conferma", "tracciabilità", "facilità", 
-                                     "catalogo", "online","checkout", "Ssntita", "garanzia", "reso", "account"),
+                                     "catalogo", "online","checkout", "garanzia", "reso", "account", "bell", "pessim", "nuov",
+                                     "benissim", "purtropp", "problem", "ben", "buon", "aspett", "attesa", "top", "futur", "risolt",
+                                     "vergogn", "inutil", "bellissim", "assurd", "super", "difett", "truff"),
                           location = c("accesso", "facilitato", "ampio", "parcheggio", "zona", "geografica", 
                                        "ambiente", "accogliente", "strutture", "moderne",
                                        "punto", "vendita", "facilità", "raggiungimento", "accessibilità", "disabili", 
                                        "prossimità","area", "centrale", "sicurezza", "atmosfera", "piacevole", "posizione","strategica", 
                                        "illuminata", "spazio", "facile", 
-                                       "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato")))
+                                       "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato", "bell", "ben")))
 
 stem_words <- function(words) {
   stemmed_words <- wordStem(words, language = "italian")
@@ -537,15 +551,22 @@ Driver$servizio <- stem_words(Driver$servizio)
 Driver$ordini <- stem_words(Driver$ordini)
 Driver$location <- stem_words(Driver$location)
 
-Driver
 Driver_Review <- dfm_lookup(Dfm_Totale,Driver)
 Driver_Review
 
 Driver_Conv_Rev <- convert(Driver_Review, to = "data.frame")
+Driver_Conv_Rev <- cbind(ID = Dfm_Totale@docvars$ID, Driver_Conv_Rev)
 
-apply(Driver_Conv_Rev[,2:5],2,sum)
+apply(Driver_Conv_Rev[,3:6],2,sum)
 prop.table(apply(Driver_Conv_Rev[,2:5],2,sum)) # da sistemare
-# Creare il grafico apposito nella scelta delle keywords per vedere in quali recensioni appaiono
 
-# Estrarre un campione di 150 e calcolare la % di uguaglianza
 
+DriverAnalysis <- full_join(Ita_StoresReview, DriverAnalysis)
+
+# SENTIMENT ANALYSIS
+
+Dizionario <- get_sentiment_dictionary(dictionary = 'nrc', 
+                                       language = "italian")
+
+Store_reviews_sentiment <- get_sentiment(Corpus_Totale,
+                                                      method = 'nrc', language = "italian")
