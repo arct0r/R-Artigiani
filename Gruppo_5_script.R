@@ -28,45 +28,53 @@ library(quanteda.textplots)
 setwd(dirname(getActiveDocumentContext()$path))
 # Dataset
 StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
-# Aggiunta Primary key
-StoresReview$ID <- seq(1:nrow(StoresReview))
-# Dataset con recensioni in italiano e non vuote.
+# Aggiunta Primary key a sinistra del dataframe
+StoresReview <- cbind(ID = seq(1:nrow(StoresReview)), StoresReview)
+
+table(StoresReview$lang_value) # presenza di altre lingue
+
+# Eliminiamo le recensioni vuote e manteniamo solo quelle in lingua italiana.
 Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
                                     is.na(StoresReview$lang_value) == TRUE) & 
                                    is.na(StoresReview$text) == FALSE,]
-# Suddivido il dataset tra twitter e places
-# Visto che abbiamo notato un'importante differenza di qualità delle recensioni
-Tweet_ita <- Ita_StoresReview[Ita_StoresReview$social == "twitter",]
-Places_ita <- Ita_StoresReview[Ita_StoresReview$social == "places",]
+# Putroppo l'algoritmo di deeplearning ha assegnato valori in lang_value 
+# diversi da it e NA alle recensioni in italiano,
+# Quindi questo filtro li elimina.
 
-apply(Tweet_ita, 2, function(x) sum(is.na(x))) # 0 testi NA
-apply(Places_ita, 2, function(x) sum(is.na(x))) # 458 testi NA!!
+table(Ita_StoresReview$social)
+# Si nota che nel dataset, le recensioni provengono solo da twitter e places.
 
-Tweet_Corpus <- corpus(Tweet_ita)
-Places_Corpus <- corpus(Places_ita)
-
-
+# Creazione corpus
+Corpus_Totale <- corpus(Ita_StoresReview)
 
 # 2: ANALISI DEL SENTIMENT CON GLI ALGORITMI ----
 
 # Campionamento con numerosità 200
+# La qualità delle recensioni di places è superiore rispetto a quelle di twitter,
+# Quindi abbiamo deciso di suddivere le due tipologie, prendendo 80% da places
+# e il 20 % da twitter
 set.seed(001)
-Training_places <- sample(Places_Corpus, size = 160, replace = FALSE)
+Training_places <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
+                          size = 160,
+                          replace = FALSE)
 set.seed(002)
-Training_tweet <- sample(Tweet_Corpus, size = 40, replace = FALSE)
+Training_tweet <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "twitter"],
+                         size = 40,
+                         replace = FALSE)
 
 # TRAINING DATA
 
-docnames(Training_tweet) <- paste0("new_", docnames(Training_tweet))
+# Corpus per l'analisi manuale
 Training_data <- c(Training_tweet, Training_places)
 
 # Corpus per il TEST SET
 Test_data <- Corpus_Totale[!(Corpus_Totale %in% Training_data)]
-attr(Test_data, "docvars")$ID
-# Verifica complementare
-setequal(Corpus_Totale, union(Test_data, Training_data))
 
-# Dataset del Campione
+# Verifica se sono complementari
+setequal(Corpus_Totale, union(Test_data, Training_data))
+# Risposta affermativa, ma si nota una differenza di 21 testi
+
+# Dataset del Campione per poterlo esportare
 
 Campione <- data.frame(
   attr(Training_data, "docvars")$ID,
@@ -75,6 +83,7 @@ Campione <- data.frame(
   Sentiment <- NA)
 names(Campione) <- c("ID","Persona","text","sentiment")
 
+# dataframe del test set
 Test_data <- data.frame(
   attr(Test_data,"docvars")$ID,
   Test_data
@@ -91,11 +100,10 @@ Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo",
 
 # Verifica celle vuote.
 apply(Campione, 2, function(x) sum(is.na(x)))
-# Nome text per il text_field
 
-str(Training_data)
+# Conversione in corpus con la variabile del sentiment
 Training_data <- corpus(Campione)
-Test_Corpus <- corpus(Test_data)
+
 
 
 Dfm_Training <- dfm(tokens(Training_data,
@@ -105,60 +113,61 @@ Dfm_Training <- dfm(tokens(Training_data,
                            remove_numbers = TRUE) %>%
                       tokens_tolower() %>% 
                       tokens_remove(c(stopwords("italian"))) %>%
-                      tokens_wordstem(language = "italian")) %>%
-  dfm_trim(min_termfreq = 10,
-           min_docfreq = 2)
+                      tokens_wordstem(language = "italian"))
 
-Dfm_Test <- dfm(tokens(Test_Corpus,
+Dfm_Test <- dfm(tokens(Test_data,
                        remove_punct = TRUE,
                        remove_symbols = TRUE,
                        remove_url = TRUE,
                        remove_numbers = TRUE) %>%
                   tokens_tolower() %>% 
                   tokens_remove(c(stopwords("italian"))) %>%
-                  tokens_wordstem(language = "italian")) %>%
-  dfm_trim(min_termfreq = 10,
-           min_docfreq = 2)
+                  tokens_wordstem(language = "italian"))
 
-length(Dfm_Training@Dimnames$features) #61
-length(Dfm_Test@Dimnames$features) #867
+length(Dfm_Training@Dimnames$features) #1251
+length(Dfm_Test@Dimnames$features) #8576
 
+# Abbasso il numero di features del test
 Dfm_Test <- dfm_match(Dfm_Test, 
                       features = featnames(Dfm_Training))
+# Dopo il match lunghezzze pari a 1251
 
+# Verifica
 setequal(featnames(Dfm_Training), 
          featnames(Dfm_Test)) 
-
-# Dopo il match lunghezzze pari a 61
-
+# Creazione matrici per gli algoritmi
 Matrice_Training <- as.matrix(Dfm_Training)
 Matrice_Test <- as.matrix(Dfm_Test)
 
-Matrice_Training
-str(Dfm_Training@docvars$sentiment)
+# Conversione del vettore sentiment in factor
 Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
 
+# ALGORITMO NAIVE BAYES
 set.seed(123) 
-
 NaiveBayesModel <- multinomial_naive_bayes(x=Matrice_Training,
                                            y=Dfm_Training@docvars$sentiment,
                                            laplace = 1)
+# Distribuzione del sentiment sul training
 summary(NaiveBayesModel)
 
+# Predizione sul test set
 Test_predictedNB <- predict(NaiveBayesModel,
                             Matrice_Test)
 
+# frequenze assolute sui 3400 testi del test
+table(Test_predictedNB)
+
+# ALGORITMO RANDOM FOREST
 set.seed(150)
-system.time(RF <- randomForest(y= Dfm_Training@docvars$sentiment, 
-                               x= Matrice_Training, 
-                               importance=TRUE,  
-                               do.trace=FALSE, 
-                               ntree=500))
+RF <- randomForest(y= Dfm_Training@docvars$sentiment,
+                   x= Matrice_Training,
+                   importance=TRUE,
+                   do.trace=FALSE,
+                   ntree=500)
 RF$predicted
 
 RF
 table(Campione$sentiment)
-set.seed(175)
 
 plot(RF, type = "l", col = c("black", "steelblue4","violetred4", "springgreen4"),
      main = "Random Forest Model Errors: sentiment variable")
@@ -166,37 +175,33 @@ legend("topright", horiz = F, cex = 0.7,
        fill = c("springgreen4", "black", "steelblue4", "violetred4"),
        c("Positive error", "Average error", "Negative error", "Neutral error"))
 
-system.time(SupportVectorMachine <- svm(
-  y= Dfm_Training@docvars$sentiment,
-  x=Matrice_Training, kernel='linear', cost = 1))
-
 Errori <- as.data.frame(RF$err.rate)
 
-which.min(Errori$OOB) # 96
+which.min(Errori$OOB) # 38
 
 set.seed(150)
-system.time(RF <- randomForest(y= Dfm_Training@docvars$sentiment, 
-                               x= Matrice_Training, 
-                               importance=TRUE,  
-                               do.trace=FALSE, 
-                               ntree=53))
+RF <- randomForest(y= Dfm_Training@docvars$sentiment,
+                   x= Matrice_Training,
+                   importance=TRUE,
+                   do.trace=FALSE,
+                   ntree=38)
 
-system.time(Test_predictedRF <- predict(RF,
-                                        Matrice_Test ,type="class"))
+Test_predictedRF <- predict(RF, Matrice_Test ,type="class")
 
+# SUPPORT VECTOR
+set.seed(175)
+SupportVectorMachine <- svm(
+  y= Dfm_Training@docvars$sentiment,
+  x=Matrice_Training, kernel='linear', cost = 1)
+
+Test_predictedSV <- predict(SupportVectorMachine, Matrice_Test)
 length(SupportVectorMachine$index)
-
-system.time(Test_predictedSV <- predict(SupportVectorMachine, 
-                                        Matrice_Test))
-Test_predictedSV
-
-# Scrivere qui tutti gli step fatti e da fare
-Tabella_descrittiva <- textstat_frequency(Testo_finito, n =500)
 
 Test_data$Bayes <- Test_predictedNB
 Test_data$Forest <- Test_predictedRF
 Test_data$Support <- Test_predictedSV
 
+str(Test_data)
 results <- as.data.frame(rbind(prop.table(table(Test_predictedNB)),
                                prop.table(table(Test_predictedRF)),
                                prop.table(table(Test_predictedSV))))
@@ -431,10 +436,6 @@ grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
 # 3: DRIVER ANALYSIS ----
 
 # Corpus
-Corpus_Totale <- corpus(Ita_StoresReview)
-str(Corpus_Totale)
-# Modo per ottenere gli ID
-attr(Corpus_Totale, "docvars")$ID
 
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
@@ -452,7 +453,7 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
                        max_termfreq = 500,
                        min_docfreq = 2)
 
-Dfm_Places <- dfm(tokens(Places_Corpus,
+Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
                          remove_punct = TRUE,
                          remove_symbols = TRUE,
                          remove_url = TRUE,
@@ -464,8 +465,6 @@ Dfm_Places <- dfm(tokens(Places_Corpus,
            max_termfreq = 500,
            min_docfreq = 2)
   
-dim(Dfm_Places)
-
 #FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
 # Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
 # QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
@@ -474,17 +473,13 @@ dim(Dfm_Places)
 Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))]
 Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
 
-# Modo per ottenere gli ID
-Dfm_Totale@docvars$ID
-# Lunghezza del DFM
-summary(Dfm_Totale)
 
 # RILEVAZIONE DELLE KEYWORDS
 
 # Top parole del DFM
-topfeatures(Dfm_Totale,50)
+topfeatures(Dfm_Places,50)
 
-Parole_Popolari <- textstat_frequency(Dfm_Totale, n =50)
+Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
 Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
 ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
@@ -496,16 +491,20 @@ ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
   theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
         plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
 
-textplot_wordcloud(Dfm_Totale, 
+textplot_wordcloud(Dfm_Places, 
                    min_size = 1.5,  
-                   max_size = 12,    
+                   max_size = 4,    
                    min.count = 10,   
                    max_words = 50,  
                    random.order = FALSE,  
                    random_color = FALSE,
                    rotation = 0,    #rotazione delle parole
                    colors = RColorBrewer::brewer.pal(8,"Dark2"))
-                   
+
+Contenitore <- as.data.frame(colnames(Dfm_Totale))
+write_xlsx(Contenitore, "Lista parole.xlsx")
+#write_xlsx(Campione, "Training Data Grezzo.xlsx") 
+
 Driver <- dictionary(list(Prezzo = c("offert*","scont*","prezz*","vend*","cost*","sottocost*", "economic*"),
                           Servizio = c("personal*","serviz*","gentil*","professional*","competent*","aiut*","cortes*","assistent*","disponibil*","cordial*",
                                        "scortes*","male*","lent*","disorg*","disorie*"),
