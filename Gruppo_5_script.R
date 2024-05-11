@@ -11,6 +11,7 @@ library(SnowballC)
 # Driver Analysis
 library(dplyr)
 library(syuzhet)
+library(newsmap)
 # Algoritmi
 library(naivebayes)
 library(randomForest)
@@ -558,10 +559,10 @@ Driver_Conv_Rev <- convert(Driver_Review, to = "data.frame")
 Driver_Conv_Rev <- cbind(ID = Dfm_Totale@docvars$ID, Driver_Conv_Rev)
 
 apply(Driver_Conv_Rev[,3:6],2,sum)
-prop.table(apply(Driver_Conv_Rev[,2:5],2,sum)) # da sistemare
+prop.table(apply(Driver_Conv_Rev[,3:6],2,sum)) # da sistemare
 
 
-DriverAnalysis <- full_join(Ita_StoresReview, DriverAnalysis)
+DriverAnalysis <- full_join(Ita_StoresReview, Driver_Conv_Rev)
 
 # SENTIMENT ANALYSIS
 
@@ -570,3 +571,71 @@ Dizionario <- get_sentiment_dictionary(dictionary = 'nrc',
 
 Store_reviews_sentiment <- get_sentiment(Corpus_Totale,
                                                       method = 'nrc', language = "italian")
+
+DriverAnalysis$sentimentAnalysis <- Store_reviews_sentiment
+
+DriverAnalysis$sentiment_labels <- ifelse(DriverAnalysis$sentimentAnalysis <= 0, "Negativo", "Positivo")
+
+RatingXsentiment <- table(DriverAnalysis$sentiment_labels, DriverAnalysis$score_rating)
+RatingXsentiment <- as.data.frame(RatingXsentiment)
+colnames(RatingXsentiment) <- c("Sentiment","Rating","Freq")
+
+ggplot(RatingXsentiment,aes(Rating, Freq, fill=Sentiment))+
+  geom_bar(position="stack",stat="identity") +   
+  scale_fill_manual(values = c("#CA3432", "darkseagreen")) +
+  labs(title = "Come cambia il valore del sentiment al variare del rating?") +
+  theme(axis.text.x = element_text(color="#993333", angle=90)) + 
+  coord_flip() +
+  ylab(label="Valori assoluti") + 
+  xlab("Rating") +
+  guides(fill=guide_legend(title="sentiment")) +
+  theme(plot.title = element_text(color = "black", size = 12, face = "plain"),
+        plot.subtitle = element_text(face = "plain"),
+        axis.title=element_text(size=10,face="plain"),
+        axis.text= element_text(size =10, face = "italic"))
+
+# EMOTION ANALYSIS
+
+EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
+
+barplot(
+  sort(colSums(prop.table(EmotionAnalysis[, 1:8]))), 
+  horiz = TRUE, 
+  cex.names = 0.7, 
+  las = 1, 
+  main = "Le emozioni nel corpus", xlab="Proporzioni",
+  col = "#8C96C6"
+)
+
+
+# NEWSMAP
+
+DriverAnaylisis_SemiSupervisedApproach <- dfm(Corpus_Totale, 
+                                            remove_number = TRUE,  
+                                            tolower = TRUE,
+                                            stem = TRUE,
+                                            dictionary = Driver)
+
+DriverAnalysis_SemiSupervisedApproach <- dfm(tokens(Corpus_Totale,
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_url = TRUE,
+                         remove_numbers = TRUE) %>%
+                           tokens_tolower() %>%
+                           tokens_wordstem(language = "italian") %>%
+                           tokens_lookup(dictionary = Driver))
+
+TextModel <- textmodel_newsmap(Dfm_Totale,
+                               DriverAnalysis_SemiSupervisedApproach)
+
+DriverAnalysis$SemiSupervised <- predict(TextModel)
+round(prop.table(table(predict(TextModel))), 2)*100
+
+DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
+                                    ifelse(DriverAnalysis$servizio > 0, "Servizio",
+                                           ifelse(DriverAnalysis$ordini > 0, "Ordini",
+                                                  ifelse(DriverAnalysis$location > 0, "Location", "NA"))))
+
+ConfrontoRisultati <- filter(DriverAnalysis, Dizionario == "NA")
+
+# 4 ----
