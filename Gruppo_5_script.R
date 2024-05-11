@@ -474,9 +474,6 @@ Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
            max_termfreq = 500,
            min_docfreq = 2)
   
-#FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
-# Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
-# QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
 
 
 # RILEVAZIONE DELLE KEYWORDS
@@ -506,9 +503,7 @@ textplot_wordcloud(Dfm_Places,
                    rotation = 0,    #rotazione delle parole
                    colors = RColorBrewer::brewer.pal(8,"Dark2"))
 
-Contenitore <- as.data.frame(colnames(Dfm_Totale))
-write_xlsx(Contenitore, "Lista parole.xlsx")
-#write_xlsx(Campione, "Training Data Grezzo.xlsx") 
+
 
 Driver <- dictionary(list(Prezzo = c("offert*","scont*","prezz*","vend*","cost*","sottocost*", "economic*"),
                           Servizio = c("personal*","serviz*","gentil*","professional*","competent*","aiut*","cortes*","assistent*","disponibil*","cordial*",
