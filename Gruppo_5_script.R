@@ -47,6 +47,23 @@ table(Ita_StoresReview$social)
 # Creazione corpus
 Corpus_Totale <- corpus(Ita_StoresReview)
 
+Dfm_Totale <- dfm(tokens(Corpus_Totale,
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_url = TRUE,
+                         remove_numbers = TRUE) %>%
+                    tokens_tolower() %>% 
+                    tokens_remove(c(stopwords("italian"))) %>%
+                    tokens_wordstem(language = "italian")) %>%
+  dfm_trim(min_termfreq = 10,
+           max_termfreq = 500,
+           min_docfreq = 2)
+
+# Toglie i tag e gli hashtag
+Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))] 
+
+Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
+
 # 2: ANALISI DEL SENTIMENT CON GLI ALGORITMI ----
 
 # Campionamento con numerosità 200
@@ -65,30 +82,24 @@ Training_tweet <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
 # TRAINING DATA
 
 # Corpus per l'analisi manuale
-Training_data <- c(Training_tweet, Training_places)
+Training_Corpus <- c(Training_tweet, Training_places)
 
 # Corpus per il TEST SET
-Test_data <- Corpus_Totale[!(Corpus_Totale %in% Training_data)]
+Test_Corpus <- Corpus_Totale[!(Corpus_Totale %in% Training_Corpus)]
 
 # Verifica se sono complementari
-setequal(Corpus_Totale, union(Test_data, Training_data))
+setequal(Corpus_Totale, union(Test_Corpus, Training_Corpus))
 # Risposta affermativa, ma si nota una differenza di 21 testi
 
 # Dataset del Campione per poterlo esportare
 
 Campione <- data.frame(
-  attr(Training_data, "docvars")$ID,
-  Persona <- rep(c("William","Davide","Maddalena","Giacomo"),each = 50),
-  Training_data,
-  Sentiment <- NA)
+  attr(Training_Corpus, "docvars")$ID,
+  persona <- rep(c("William","Davide","Maddalena","Giacomo"),each = 50),
+  Training_Corpus,
+  sentiment <- NA)
 names(Campione) <- c("ID","Persona","text","sentiment")
 
-# dataframe del test set
-Test_data <- data.frame(
-  attr(Test_data,"docvars")$ID,
-  Test_data
-)
-names(Test_data) <- c("ID","text")
 
 #Esportare il Campione
 #write_xlsx(Campione, "Training Data Grezzo.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
@@ -102,35 +113,40 @@ Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo",
 apply(Campione, 2, function(x) sum(is.na(x)))
 
 # Conversione in corpus con la variabile del sentiment
-Training_data <- corpus(Campione)
+Training_Corpus <- corpus(Campione)
 
-
-
-Dfm_Training <- dfm(tokens(Training_data,
+Dfm_Training <- dfm(tokens(Training_Corpus,
                            remove_punct = TRUE,
                            remove_symbols = TRUE,
                            remove_url = TRUE,
                            remove_numbers = TRUE) %>%
                       tokens_tolower() %>% 
                       tokens_remove(c(stopwords("italian"))) %>%
-                      tokens_wordstem(language = "italian"))
+                      tokens_wordstem(language = "italian")) %>%
+  dfm_trim(max_termfreq = 500)
 
-Dfm_Test <- dfm(tokens(Test_data,
+Dfm_Training <- Dfm_Training[,!(colnames(Dfm_Training) %in% Parole_Brutte)]
+
+
+Dfm_Test <- dfm(tokens(Test_Corpus,
                        remove_punct = TRUE,
                        remove_symbols = TRUE,
                        remove_url = TRUE,
                        remove_numbers = TRUE) %>%
                   tokens_tolower() %>% 
                   tokens_remove(c(stopwords("italian"))) %>%
-                  tokens_wordstem(language = "italian"))
+                  tokens_wordstem(language = "italian")) %>%
+  dfm_trim(max_termfreq = 500)
 
-length(Dfm_Training@Dimnames$features) #1251
-length(Dfm_Test@Dimnames$features) #8576
+Dfm_Test <- Dfm_Test[,!(colnames(Dfm_Test) %in% Parole_Brutte)]
+
+length(Dfm_Training@Dimnames$features) #1235
+length(Dfm_Test@Dimnames$features) #8533
 
 # Abbasso il numero di features del test
 Dfm_Test <- dfm_match(Dfm_Test, 
                       features = featnames(Dfm_Training))
-# Dopo il match lunghezzze pari a 1251
+# Dopo il match lunghezzze pari a 1235
 
 # Verifica
 setequal(featnames(Dfm_Training), 
@@ -143,7 +159,7 @@ Matrice_Test <- as.matrix(Dfm_Test)
 Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
 
 # ALGORITMO NAIVE BAYES
-set.seed(123) 
+set.seed(123)
 NaiveBayesModel <- multinomial_naive_bayes(x=Matrice_Training,
                                            y=Dfm_Training@docvars$sentiment,
                                            laplace = 1)
@@ -164,14 +180,12 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    importance=TRUE,
                    do.trace=FALSE,
                    ntree=500)
-RF$predicted
-
 RF
 table(Campione$sentiment)
 
 plot(RF, type = "l", col = c("black", "steelblue4","violetred4", "springgreen4"),
-     main = "Random Forest Model Errors: sentiment variable")
-legend("topright", horiz = F, cex = 0.7,
+     main = "Random Forest Model Errors: sentiment variable") +
+  legend("topright", horiz = F, cex = 0.7,
        fill = c("springgreen4", "black", "steelblue4", "violetred4"),
        c("Positive error", "Average error", "Negative error", "Neutral error"))
 
@@ -184,9 +198,10 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    x= Matrice_Training,
                    importance=TRUE,
                    do.trace=FALSE,
-                   ntree=38)
+                   ntree=23)
 
 Test_predictedRF <- predict(RF, Matrice_Test ,type="class")
+table(Test_predictedRF)
 
 # SUPPORT VECTOR
 set.seed(175)
@@ -194,14 +209,19 @@ SupportVectorMachine <- svm(
   y= Dfm_Training@docvars$sentiment,
   x=Matrice_Training, kernel='linear', cost = 1)
 
+length(SupportVectorMachine$index) # 173 support vector
+
 Test_predictedSV <- predict(SupportVectorMachine, Matrice_Test)
-length(SupportVectorMachine$index)
 
-Test_data$Bayes <- Test_predictedNB
-Test_data$Forest <- Test_predictedRF
-Test_data$Support <- Test_predictedSV
+table(Test_predictedSV)
 
-str(Test_data)
+Confronto_test <- data.frame(
+  ID = attr(Test_Corpus, "docvars")$ID,
+  Test_Corpus,
+  Test_predictedNB,
+  Test_predictedRF,
+  Test_predictedSV)
+
 results <- as.data.frame(rbind(prop.table(table(Test_predictedNB)),
                                prop.table(table(Test_predictedRF)),
                                prop.table(table(Test_predictedSV))))
@@ -209,7 +229,6 @@ results <- as.data.frame(rbind(prop.table(table(Test_predictedNB)),
 results$algorithm <- c("Naive Bayes", "Random Forest", "Support Vector Machine")
 
 df.long<-melt(results,id.vars=c("algorithm"))
-str(df.long)
 
 ggplot(df.long,aes(algorithm,value,fill=variable))+
   geom_bar(position="dodge",stat="identity") + scale_fill_manual(values = c("violetred3", "yellow3", "orange2")) +
@@ -222,6 +241,8 @@ ggplot(df.long,aes(algorithm,value,fill=variable))+
         axis.text= element_text(size =10, face = "italic")
   )
 
+# CROSS VALIDATION
+
 Matrice_Training2 <- Matrice_Training
 
 #Assicuiamo la replicabilità 
@@ -231,7 +252,7 @@ k <- 5
 #Dividiamo la matrice in k folders
 folds <- cvFolds(NROW(Matrice_Training2), K = k)
 
-system.time(for(i in 1:k){
+for(i in 1:k){
   Matrice_Training <-
     Matrice_Training2 [folds$subsets[folds$which != i], ]
   ValidationSet <-
@@ -252,7 +273,7 @@ system.time(for(i in 1:k){
   df<-confusionMatrix( class_table, mode = "everything")
   df_measures_NB<-paste0("conf.mat.nb",i)
   assign(df_measures_NB,df)
-})
+}
 
 NB_Prediction <- data.frame(col1=vector(), col2=vector(), col3=vector(), col4=vector())
 
@@ -278,7 +299,7 @@ AverageAccuracy_NB
 AverageF1_NB
 
 # RANDOM FOREST
-system.time(for(i in 1:k){
+for(i in 1:k){
   Matrice_Training <-
     Matrice_Training2 [folds$subsets[folds$which != i], ]
   ValidationSet <-
@@ -287,7 +308,7 @@ system.time(for(i in 1:k){
   RandomForest <- randomForest(
     y= Dfm_Training[folds$subsets[folds$which != i], ]
     @docvars$sentiment ,
-    x=Matrice_Training, do.trace=FALSE, ntree=53)
+    x=Matrice_Training, do.trace=FALSE, ntree=23)
   Predictions_RF <- predict(RandomForest, 
                             newdata= ValidationSet, 
                             type="class")
@@ -297,7 +318,7 @@ system.time(for(i in 1:k){
   df<-confusionMatrix( class_table, mode = "everything")
   df_measures_RF<-paste0("conf.mat.rf",i)
   assign(df_measures_RF,df)
-})
+}
 
 RF_Predictions <- data.frame(col1=vector(), col2=vector(), col3=vector(), col4 = vector())
 
@@ -327,7 +348,7 @@ AverageF1_RF
 
 # SUPPORT VECTOR MACHINE
 
-system.time(for(i in 1:k){
+for(i in 1:k){
   Matrice_Training <-
     Matrice_Training2 [folds$subsets[folds$which != i], ]
   ValidationSet <-
@@ -345,7 +366,7 @@ system.time(for(i in 1:k){
   df<-confusionMatrix( class_table, mode = "everything")
   df_measures_SVM<-paste0("conf.mat.sv",i)
   assign(df_measures_SVM,df)
-})
+}
 
 
 SVM_Prediction <- data.frame(col1=vector(), col2=vector(), col3=vector(), col4=vector())
@@ -440,18 +461,6 @@ grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
-# DFM... MODIFICARE LE CONDIZIONI TRIMMING
-Dfm_Totale <- dfm(tokens(Corpus_Totale,
-                        remove_punct = TRUE,
-                        remove_symbols = TRUE,
-                        remove_url = TRUE,
-                        remove_numbers = TRUE) %>%
-                   tokens_tolower() %>% 
-                   tokens_remove(c(stopwords("italian"))) %>%
-                   tokens_wordstem(language = "italian")) %>%
-              dfm_trim(min_termfreq = 10,
-                       max_termfreq = 500,
-                       min_docfreq = 2)
 
 Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
                          remove_punct = TRUE,
@@ -468,10 +477,6 @@ Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
 #FARE WORDCLOUD per le keywords e scelta di variabili CATEGORIALI
 # Raggruppare i valori delle varia colonne, in base al brand e alla presenza di keywords relative alla variabile categoriale scelta
 # QUINDI CRARE UN DATAFRAME CON I VALORI AGGREGATI
-
-# Toglie i tag e gli hashtag
-Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))]
-Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
 
 
 # RILEVAZIONE DELLE KEYWORDS
