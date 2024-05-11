@@ -1,29 +1,32 @@
-# Parole per la categoria Prezzo
-prezzo <- c("Promozione", "Risparmio", "qualità", "prezzo", "Economicità", 
-            "economico", "concorrenziali", "sconto", 
-            "Offerta", "Budget", "ragionevole","costo", "sostenibile", 
-            "convenienti", "sottocosto")
 
-# Parole per la categoria Servizio
-servizio <- c("Rapidità", "Empatia", "Professionale", "Supporto", 
-              "Risoluzione","problemi",  "Cordialità", "Assistenza", "vendita", 
-              "immediata", "Efficienza", "cortese", "reclami", 
-              "Competenza", "cliente", "Flessibilità", "Tempestività", 
-               "Servizio", "Accoglienza", "caloroso", "gentile", "personal", "competente", "disponibile", "male",
-              "lento", "disorganizzato", "disordinato", "scortese", "cafone", "garanzia", "reso", "account")
-
-# Parole per la categoria Ordini
-ordini <- c("Transazione", "acquisto", "pagamento", "Tempo", "consegna", 
-            "ordine", "Opzioni", "Modalità", "ritiro", 
-            "Rimborso", "Conferma", "Tracciabilità", "Facilità", 
-            "Catalogo", "online","checkout", "Selezione", 
-            "Personalizzazione", "veloce", "garantita", "garanzia", "reso", "account"
-            )
-
-# Parole per la categoria Location
-location <- c("Accesso", "Facilitato", "Ampio", "Parcheggio", "Zona", "geografica", 
-              "ambiente", "accogliente", "Strutture", "moderne",
-              "Punto", "vendita", "Facilità", "raggiungimento", "Accessibilità", "disabili", 
-              "Prossimità","area", "centrale", "Sicurezza", "Atmosfera", "piacevole", "Posizione","strategica", 
-              "illuminata", "Spazio", "Facile", 
-              "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato")
+Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
+                                     "economico", "concorrenziali", "sconto", 
+                                     "offerta", "budget", "ragionevole","costo", "sostenibile", 
+                                     "convenienti", "sottocosto", "eccezional", "super", "miglior", "ben", 
+                                     "top", "futur", "offert", "convenient", "risparm", "assurd", "super", "pazzesc", "gratis"),
+                          servizio =  c("rapidità", "Empatia", "professionale", "supporto", 
+                                        "risoluzione","problemi",  "cordialità", "assistenza", "vendita", 
+                                        "immediata", "efficienza", "cortese", "reclami", 
+                                        "competenza", "cliente", "flessibilità", "tempestività", 
+                                        "servizio", "accoglienza", "caloroso", "gentile", "personal", "competente", "disponibile", "male",
+                                        "lento", "disorganizzato", "disordinato", "scortese", "cafone", "garanzia", "reso", "account",
+                                        "signor", "reparto", "richiest", "graz", "eccezional", "inform", "miglior", "ragazz",
+                                        "rispost", "gent", "gentilissim", "rispett", "competent", "bell", "ringraz", "aiut",
+                                        "pront", "addett", "pessim", "pazienz", "ore", "benissim", "purtropp", "purtropp", "problem",
+                                        "incompetent", "rivolg", "compl", "ben", "consigl", "prossim", "buon", "gentilezz", "educ",
+                                        "simpat", "dispon", "attenzion", "qualif", "aspett", "grandissim", "disponibil", "esigent", "top",
+                                        "giovan", "assist", "futur", "risolt", "bravissim", "commess", "brav", "spieg", "dubb", "vergogn",
+                                        "inutil", "maleduc", "pochissim", "signorin", "bellissim", "perfett", "attent", "super",
+                                        "pazzesc", "soluzion", "difett", "truff", "qualit", "normal", "scortes", "intelligent"),
+                          ordini = c("transazione", "acquisto", "pagamento", "tempo", "consegna", 
+                                     "ordine", "opzioni", "modalità", "ritiro", 
+                                     "rimborso", "conferma", "tracciabilità", "facilità", 
+                                     "catalogo", "online","checkout", "garanzia", "reso", "account", "bell", "pessim", "nuov",
+                                     "benissim", "purtropp", "problem", "ben", "buon", "aspett", "attesa", "top", "futur", "risolt",
+                                     "vergogn", "inutil", "bellissim", "assurd", "super", "difett", "truff"),
+                          location = c("accesso", "facilitato", "ampio", "parcheggio", "zona", "geografica", 
+                                       "ambiente", "accogliente", "strutture", "moderne",
+                                       "punto", "vendita", "facilità", "raggiungimento", "accessibilità", "disabili", 
+                                       "prossimità","area", "centrale", "sicurezza", "atmosfera", "piacevole", "posizione","strategica", 
+                                       "illuminata", "spazio", "facile", 
+                                       "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato", "bell", "ben")))
