@@ -1,5 +1,4 @@
 # LIBRERIE ----
-
 # Dataset
 library(readxl)
 library(writexl)
@@ -8,6 +7,7 @@ library(rstudioapi)
 # Pre-processing
 library(quanteda)
 library(quanteda.textstats)
+library(SnowballC)
 # Algoritmi
 library(naivebayes)
 library(randomForest)
@@ -505,12 +505,39 @@ textplot_wordcloud(Dfm_Places,
 
 
 
-Driver <- dictionary(list(Prezzo = c("offert*","scont*","prezz*","vend*","cost*","sottocost*", "economic*"),
-                          Servizio = c("personal*","serviz*","gentil*","professional*","competent*","aiut*","cortes*","assistent*","disponibil*","cordial*",
-                                       "scortes*","male*","lent*","disorg*","disorie*"),
-                          Ordini = c("ordin*","consegn*","ritir*","garanz*","online*","spedi*","reso","account"),
-                          Location = c("negoz*","post*","parchegg*","affollat*","piccol*","disord*")))
+Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
+                                     "economico", "concorrenziali", "sconto", 
+                                     "offerta", "budget", "ragionevole","costo", "sostenibile", 
+                                     "convenienti", "sottocosto"),
+                          servizio =  c("rapidità", "Empatia", "professionale", "supporto", 
+                                        "risoluzione","problemi",  "cordialità", "assistenza", "vendita", 
+                                        "immediata", "efficienza", "cortese", "reclami", 
+                                        "competenza", "cliente", "flessibilità", "tempestività", 
+                                        "servizio", "accoglienza", "caloroso", "gentile", "personal", "competente", "disponibile", "male",
+                                        "lento", "disorganizzato", "disordinato", "scortese", "cafone", "garanzia", "reso", "account"),
+                          ordini = c("transazione", "acquisto", "pagamento", "tempo", "consegna", 
+                                     "ordine", "opzioni", "modalità", "ritiro", 
+                                     "rimborso", "conferma", "tracciabilità", "facilità", 
+                                     "catalogo", "online","checkout", "Ssntita", "garanzia", "reso", "account"),
+                          location = c("accesso", "facilitato", "ampio", "parcheggio", "zona", "geografica", 
+                                       "ambiente", "accogliente", "strutture", "moderne",
+                                       "punto", "vendita", "facilità", "raggiungimento", "accessibilità", "disabili", 
+                                       "prossimità","area", "centrale", "sicurezza", "atmosfera", "piacevole", "posizione","strategica", 
+                                       "illuminata", "spazio", "facile", 
+                                       "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato")))
 
+stem_words <- function(words) {
+  stemmed_words <- wordStem(words, language = "italian")
+  return(stemmed_words)
+}
+
+str(Driver)
+Driver$prezzo <- stem_words(Driver$prezzo)
+Driver$servizio <- stem_words(Driver$servizio)
+Driver$ordini <- stem_words(Driver$ordini)
+Driver$location <- stem_words(Driver$location)
+
+Driver
 Driver_Review <- dfm_lookup(Dfm_Totale,Driver)
 Driver_Review
 
