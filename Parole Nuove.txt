@@ -1,3 +1,9 @@
+# Parole per la categoria Prezzo
+prezzo <- c("Promozione", "Risparmio", "qualità", "prezzo", "Economicità", 
+            "economico", "concorrenziali", "sconto", 
+            "Offerta", "Budget", "ragionevole","costo", "sostenibile", 
+            "convenienti", "sottocosto")
+
 # Parole per la categoria Servizio
 servizio <- c("Rapidità", "Empatia", "Professionale", "Supporto", 
               "Risoluzione","problemi",  "Cordialità", "Assistenza", "vendita", 
