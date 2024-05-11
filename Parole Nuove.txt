@@ -1,0 +1,23 @@
+# Parole per la categoria Servizio
+servizio <- c("Rapidità", "Empatia", "Professionale", "Supporto", 
+              "Risoluzione","problemi",  "Cordialità", "Assistenza", "vendita", 
+              "immediata", "Efficienza", "cortese", "reclami", 
+              "Competenza", "cliente", "Flessibilità", "Tempestività", 
+               "Servizio", "Accoglienza", "caloroso", "gentile", "personal", "competente", "disponibile", "male",
+              "lento", "disorganizzato", "disordinato", "scortese", "cafone", "garanzia", "reso", "account")
+
+# Parole per la categoria Ordini
+ordini <- c("Transazione", "acquisto", "pagamento", "Tempo", "consegna", 
+            "ordine", "Opzioni", "Modalità", "ritiro", 
+            "Rimborso", "Conferma", "Tracciabilità", "Facilità", 
+            "Catalogo", "online","checkout", "Selezione", 
+            "Personalizzazione", "veloce", "garantita", "garanzia", "reso", "account"
+            )
+
+# Parole per la categoria Location
+location <- c("Accesso", "Facilitato", "Ampio", "Parcheggio", "Zona", "geografica", 
+              "ambiente", "accogliente", "Strutture", "moderne",
+              "Punto", "vendita", "Facilità", "raggiungimento", "Accessibilità", "disabili", 
+              "Prossimità","area", "centrale", "Sicurezza", "Atmosfera", "piacevole", "Posizione","strategica", 
+              "illuminata", "Spazio", "Facile", 
+              "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato")
