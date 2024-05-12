@@ -228,6 +228,7 @@ table(Test_predictedSV)
 
 Confronto_test <- data.frame(
   ID = attr(Test_Corpus, "docvars")$ID,
+  social = attr(Test_Corpus, "docvars")$social,
   Test_Corpus,
   Test_predictedNB,
   Test_predictedRF,
@@ -478,6 +479,43 @@ Df_sentiment <- data.frame(
 
 Ita_StoresReview <- merge(Ita_StoresReview, Df_sentiment, by='ID')
 
+set.seed(007)
+AAP_test_data_places <- Confronto_test %>%
+  filter(social == 'places') %>%
+  slice_sample(n=40, replace = FALSE)
+# Con questo codice estraggo 40 random samples dal testing data con social == places
+
+set.seed(007)
+AAP_test_data_twitter <- Confronto_test %>%
+  filter(social == 'twitter') %>%
+  slice_sample(n=20, replace = FALSE)
+
+# AAP_test_data <- rbind(AAP_test_data_places, AAP_test_data_twitter)
+# Esporto i due dataframe. Perchè non li unisco? Perchè questo linguaggio è SPAZZATURA e da errori strani.
+# Farò il bind manuale su excel
+#write_xlsx(AAP_test_data_places, 'aap_sample_places.xlsx')
+#write_xlsx(AAP_test_data_twitter, 'aap_sample_twitter.xlsx')
+
+AAP_test_data <- read_excel("aap_reviewed.xlsx")
+AAP_test_data$human_val <- ifelse(AAP_test_data$human_val  == -1, "Negativo", 
+                                  ifelse(AAP_test_data$human_val  == 0, "Neutro", 
+                                         "Positivo"))
+
+AAP_confronto <- c(Bayes = sum(AAP_test_data$Test_predictedNB == AAP_test_data$human_val),
+                   RF = sum(AAP_test_data$Test_predictedRF == AAP_test_data$human_val),
+                   SV = sum(AAP_test_data$Test_predictedSV == AAP_test_data$human_val))
+
+AAP_confronto <- data.frame(
+  Bayes = c(sum(AAP_test_data$Test_predictedNB == AAP_test_data$human_val),
+            sum(AAP_test_data$Test_predictedNB == AAP_test_data$human_val)/60*100),
+  
+  RF = c(sum(AAP_test_data$Test_predictedRF == AAP_test_data$human_val),
+         sum(AAP_test_data$Test_predictedRF == AAP_test_data$human_val)/60*100),
+  
+  SV = c(sum(AAP_test_data$Test_predictedSV == AAP_test_data$human_val),
+         sum(AAP_test_data$Test_predictedSV == AAP_test_data$human_val)/60*100)
+)
+rownames(AAP_confronto) <- c("Freq Assoluta", "Freq Relativa")
 
 # 3: DRIVER ANALYSIS ----
 
@@ -648,34 +686,7 @@ DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
 
 ConfrontoRisultati <- filter(DriverAnalysis, Dizionario == "NA")
 DriverAnalysis$doc_id <- NULL
+
 # 4 ----
 
-Confronto_test_2 <- merge(Confronto_test, Ita_StoresReview[,c("ID", "social")], by='ID')
-
-set.seed(007)
-AAP_test_data_places <- Confronto_test_2 %>%
-  filter(social == 'places') %>%
-  slice_sample(n=40, replace = FALSE)
-# Con questo codice estraggo 40 random samples dal testing data con social == places
-
-set.seed(007)
-AAP_test_data_twitter <- Confronto_test_2 %>%
-  filter(social == 'twitter') %>%
-  slice_sample(n=20, replace = FALSE)
-
-# AAP_test_data <- rbind(AAP_test_data_places, AAP_test_data_twitter)
-# Esporto i due dataframe. Perchè non li unisco? Perchè questo linguaggio è SPAZZATURA e da errori strani.
-# Farò il bind manuale su excel
-#write_xlsx(AAP_test_data_places, 'aap_sample_places.xlsx')
-#write_xlsx(AAP_test_data_twitter, 'aap_sample_twitter.xlsx')
-
-AAP_test_data <- read_excel("aap_reviewed.xlsx")
-AAP_test_data$human_val <- ifelse(AAP_test_data$human_val  == -1, "Negativo", 
-                                  ifelse(AAP_test_data$human_val  == 0, "Neutro", 
-                                         "Positivo"))
-
-AAP_confronto <- c(Bayes = sum(AAP_test_data$Test_predictedNB == AAP_test_data$human_val),
-                   RF = sum(AAP_test_data$Test_predictedRF == AAP_test_data$human_val),
-                   SV = sum(AAP_test_data$Test_predictedSV == AAP_test_data$human_val))
-AAP_confronto_perc  <- (AAP_confronto/60)*100
-AAP_confronto_perc
+table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment)
