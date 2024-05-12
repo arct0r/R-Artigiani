@@ -180,7 +180,7 @@ Test_predictedNB <- predict(NaiveBayesModel,
 
 # frequenze assolute sui 3400 testi del test
 table(Test_predictedNB)
-
+Test_predictedNB
 
 # ALGORITMO RANDOM FOREST
 set.seed(150)
@@ -402,7 +402,7 @@ AverageAccuracy_SVM # 73%
 AverageF1_SVM # 62,2%
 
 
-# CONFRONTO _____ DA MIGLIORARE !!!!
+# CONFRONTO
 AccNB <- as.data.frame(AverageAccuracy_NB )
 colnames(AccNB)[1] <- "NB"
 
@@ -421,7 +421,6 @@ Accuracy_models <- cbind(AccNB, AccRF, AccSVM)
 Accuracy_models
 
 Accuracy_models_Melt <-melt(Accuracy_models)
-str(Accuracy_models_Melt)
 
 plot_accuracy <- ggplot(Accuracy_models_Melt, aes(x=variable, y=value, color = variable)) +
   geom_boxplot() + xlab("Algorithm") + ylab(label="Values of accuracy") +
@@ -461,54 +460,71 @@ plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
   )
 
 grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
+str(Test_Corpus)
+
+Esiti_algo_Test <- data.frame(
+  ID = attr(Test_Corpus, "docvars")$ID,
+  social = attr(Test_Corpus, "docvars")$social,
+  text = Test_Corpus,
+  Bayes = Test_predictedNB,
+  RF = Test_predictedRF,
+  SVM = Test_predictedSV
+)
+
+Df_sentiment <- data.frame(
+  ID = c(Training_Corpus$ID, Test_Corpus$ID),
+  NB_sentiment = c(Campione$sentiment, as.vector(Test_predictedNB))
+)
+
+Ita_StoresReview <- merge(Ita_StoresReview, Df_sentiment, by='ID')
+table(is.na(Ita_StoresReview_test$BayesVal))
+
 
 # 3: DRIVER ANALYSIS ----
 
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
-# INUTILE
-#Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
-#                        remove_punct = TRUE,
-#                        remove_symbols = TRUE,
- #                        remove_url = TRUE,
-  #                       remove_numbers = TRUE) %>%
- #                   tokens_tolower() %>% 
-   #                 tokens_remove(c(stopwords("italian"))) %>%
-  #                  tokens_wordstem(language = "italian")) %>%
- # dfm_trim(min_termfreq = 10,
-  #         max_termfreq = 500,
-   #        min_docfreq = 2)
   
-
+Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_url = TRUE,
+                         remove_numbers = TRUE) %>%
+                    tokens_tolower() %>% 
+                    tokens_remove(c(stopwords("italian"))) %>%
+                    tokens_wordstem(language = "italian")) %>%
+  dfm_trim(min_termfreq = 10,
+           max_termfreq = 500, # Abbiamo messo un tetto per non considerare i 3 brand
+           min_docfreq = 2)
 
 # RILEVAZIONE DELLE KEYWORDS
 
 # Top parole del DFM
-#topfeatures(Dfm_Places,50)
+topfeatures(Dfm_Places,50)
 
 # DA RIVEDERE
-#Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
-#Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
+Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
+Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
-#ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
- # geom_point(size = 1.5, color = "Darkorange2") +
-  #theme_bw() +
-#  theme(axis.text.x = element_text(angle=360, hjust=1)) +
- # labs(x = "Features", y = "Frequenza", 
-  #     title = "Le 20 parole più frequenti nelle recensioni") +
-  #theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
-   #     plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
+ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
+ geom_point(size = 1.5, color = "Darkorange2") +
+  theme_bw() +
+theme(axis.text.x = element_text(angle=360, hjust=1)) +
+labs(x = "Features", y = "Frequenza", 
+      title = "Le 20 parole più frequenti nelle recensioni") +
+  theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
+        plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
 
-#textplot_wordcloud(Dfm_Places, 
- #                  min_size = 1.5,  
-  #                 max_size = 4,    
-   #                min.count = 10,   
-    #               max_words = 50,  
-     #              random.order = FALSE,  
-      #             random_color = FALSE,
-       #            rotation = 0,    #rotazione delle parole
-        #           colors = RColorBrewer::brewer.pal(8,"Dark2"))
+textplot_wordcloud(Dfm_Places, 
+                  min_size = 1.5,  
+                  max_size = 4,    
+                   min.count = 10,   
+                   max_words = 50,  
+                   random.order = FALSE,  
+                   random_color = FALSE,
+                   rotation = 0,    #rotazione delle parole
+                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
 
 
 # 3.1: KEYWORDS E DRIVER ----
@@ -632,5 +648,6 @@ DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
                                                   ifelse(DriverAnalysis$location > 0, "Location", "NA"))))
 
 ConfrontoRisultati <- filter(DriverAnalysis, Dizionario == "NA")
-
+DriverAnalysis$doc_id <- NULL
 # 4 ----
+
