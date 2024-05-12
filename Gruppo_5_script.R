@@ -26,6 +26,9 @@ library(caret)
 library(ggplot2)
 library(gridExtra)
 library(quanteda.textplots)
+library(kableExtra)
+library(flextable)
+library(officer)
 
 # 1: DATASET E PULIZIA (Corpus, Dfm) ----
 
@@ -689,4 +692,100 @@ DriverAnalysis$doc_id <- NULL
 
 # 4 ----
 
-table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment)
+# TABELLA GENERALE
+flex_table_stores = data.frame(unclass(table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment)))
+flex_table_stores$media_rating = round(c(mean(Ita_StoresReview$score_rating[Ita_StoresReview$Player=='Euronics'],na.rm = TRUE),
+                                         mean(Ita_StoresReview$score_rating[Ita_StoresReview$Player=='Mediaworld'],na.rm = TRUE),
+                                         mean(Ita_StoresReview$score_rating[Ita_StoresReview$Player=='Unieuro'],na.rm = TRUE)), 2)
+flex_table_stores = cbind(Player = c("Euronics", "Mediaworld", "Unieuro"), flex_table_stores)
+flex_table_stores
+
+
+set_flextable_defaults(
+  font.family = "Arial", font.size = 10, 
+  border.color = "gray", big.mark = "")
+
+ft <- flextable(head(flex_table_stores)) |> 
+  bold(part = "header") 
+ft
+
+ft |>
+  bg(j = "media_rating", 
+     bg = scales::col_quantile(palette = c("wheat", "red"), domain =NULL)) |> 
+  add_footer_lines("God help us. R is not that nice. Almost as bad as SQL")
+
+# TABELLA DRIVER SENTIMENT
+
+# TABELLA DRIVER RATING
+
+# GRAFICI
+
+# check
+table(Ita_StoresReview$score_rating, Ita_StoresReview$NB_sentiment)
+
+
+
+# DISTRIBUZIONE SENTIMENT PER BRAND
+Brand_sentiment <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment))
+
+Brand_sentiment <- rename(
+  Brand_sentiment, 
+  "Brand" = "Var1", 
+  "Sentiment" = "Var2"
+)
+
+ggplot(Brand_sentiment,aes(x = Brand, y = Freq, fill = Sentiment))+
+  geom_bar(position="stack",stat="identity") +   
+  
+  scale_fill_manual(values = c("#993333", "grey", "darkseagreen")) +
+  labs(title = "Come varia il sentiment nei diversi brand?") +
+  coord_flip() +
+  ylab(label="Valori assoluti") + 
+  xlab("") +
+  #la legenda viene generata in modo automatico
+  guides(fill=guide_legend(title="Sentiment")) + 
+  theme(plot.title = element_text(color = "black", size = 12, face = "bold"),
+        plot.subtitle = element_text(face = "plain"),
+        axis.title=element_text(size=10,face="plain"),
+        axis.text= element_text(size =10, face = "italic"),
+        axis.text.x = element_text(color="#993333", angle=45))
+
+
+# DISTRIBUZIONE RATING PER BRAND
+Brand_rating <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$score_rating))
+
+Brand_rating <- rename(
+  Brand_rating, 
+  "Brand" = "Var1", 
+  "Rating" = "Var2"
+)
+
+ggplot(Brand_rating,aes(x = Brand, y = Freq, fill = Rating))+
+  geom_bar(position="dodge",stat="identity") +   
+  
+  scale_fill_manual(values = c("#993333", "#FF5733", "#FFC300", "#DAF7A6", "#7FFF00")) +
+  labs(title = "Come varia il rating nei diversi brand?") +
+  #rappresentiamo le barre in orizzontale (inverte gli assi)
+  #coord_flip() +
+  ylab(label="Valori assoluti") + 
+  xlab("") +
+  #la legenda viene generata in modo automatico
+  guides(fill=guide_legend(title="Rating")) + 
+  theme(plot.title = element_text(color = "black", size = 12, face = "bold"),
+        plot.subtitle = element_text(face = "plain"),
+        axis.title=element_text(size=10,face="plain"),
+        axis.text= element_text(size =10, face = "italic"),
+        axis.text.x = element_text(color="#993333", angle=45))
+
+
+
+# RELAZIONE TRA SENTIMENT E RATING
+cross_tab <- table(Ita_StoresReview$NB_sentiment, Ita_StoresReview$score_rating)
+
+# Creazione di un grafico a matrice di confusione
+heatmap(cross_tab, col = colorRampPalette(c("blue", "white", "red"))(256), main = "Matrice di confusione tra Sentiment e Rating")
+legend("topright", legend = c("Basso", "Medio", "Alto"), fill = c("blue", "white", "red"), title = "Rating")
+
+# GRAFICI DRIVER
+
+
