@@ -7,7 +7,7 @@ library(rstudioapi)
 # Pre-processing
 library(quanteda)
 library(quanteda.textstats)
-library(SnowballC)
+library(SnowballC) # stemming delle keywords
 # Driver Analysis
 library(dplyr)
 library(syuzhet)
@@ -27,7 +27,8 @@ library(ggplot2)
 library(gridExtra)
 library(quanteda.textplots)
 
-# 1: DATASET E PULIZIA ----
+# 1: DATASET E PULIZIA (Corpus, Dfm) ----
+
 # Directory della cartella condivisa
 setwd(dirname(getActiveDocumentContext()$path))
 # Dataset
@@ -35,15 +36,14 @@ StoresReview <- read_excel("GRUPPO 3-4-5. Industry elettronica.xlsx")
 # Aggiunta Primary key a sinistra del dataframe
 StoresReview <- cbind(ID = seq(1:nrow(StoresReview)), StoresReview)
 
-table(StoresReview$lang_value) # presenza di altre lingue
+table(StoresReview$lang_value) # Presenza di altre lingue
 
 # Eliminiamo le recensioni vuote e manteniamo solo quelle in lingua italiana.
 Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
                                     is.na(StoresReview$lang_value) == TRUE) & 
                                    is.na(StoresReview$text) == FALSE,]
 # Putroppo l'algoritmo di deeplearning ha assegnato valori in lang_value 
-# diversi da it e NA alle recensioni in italiano,
-# Quindi questo filtro li elimina.
+# diversi da it e NA anche a delle recensioni in italiano, quindi li elimina.
 
 table(Ita_StoresReview$social)
 # Si nota che nel dataset, le recensioni provengono solo da twitter e places.
@@ -51,6 +51,7 @@ table(Ita_StoresReview$social)
 # Creazione corpus
 Corpus_Totale <- corpus(Ita_StoresReview)
 
+# Creazione dfm
 Dfm_Totale <- dfm(tokens(Corpus_Totale,
                          remove_punct = TRUE,
                          remove_symbols = TRUE,
@@ -60,12 +61,12 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
                     tokens_remove(c(stopwords("italian"))) %>%
                     tokens_wordstem(language = "italian")) %>%
   dfm_trim(min_termfreq = 10,
-           max_termfreq = 500,
+           max_termfreq = 500, # Abbiamo messo un tetto per non considerare i 3 brand
            min_docfreq = 2)
 
-# Toglie i tag e gli hashtag
+# Raggruppiamo i tag e gli hashtag
 Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))] 
-
+# Li togliamo
 Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
 
 # 2: ANALISI DEL SENTIMENT CON GLI ALGORITMI ----
@@ -74,6 +75,8 @@ Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
 # La qualità delle recensioni di places è superiore rispetto a quelle di twitter,
 # Quindi abbiamo deciso di suddivere le due tipologie, prendendo 80% da places
 # e il 20 % da twitter
+
+# 2.1: PREPARAZIONE DEI DATI (training, test, matrici) ----
 set.seed(001)
 Training_places <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
                           size = 160,
@@ -82,8 +85,6 @@ set.seed(002)
 Training_tweet <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "twitter"],
                          size = 40,
                          replace = FALSE)
-
-# TRAINING DATA
 
 # Corpus per l'analisi manuale
 Training_Corpus <- c(Training_tweet, Training_places)
@@ -96,14 +97,13 @@ setequal(Corpus_Totale, union(Test_Corpus, Training_Corpus))
 # Risposta affermativa, ma si nota una differenza di 21 testi
 
 # Dataset del Campione per poterlo esportare
-
 Campione <- data.frame(
-  attr(Training_Corpus, "docvars")$ID,
+  ID = attr(Training_Corpus, "docvars")$ID,
   persona <- rep(c("William","Davide","Maddalena","Giacomo"),each = 50),
   Training_Corpus,
   sentiment <- NA)
 names(Campione) <- c("ID","Persona","text","sentiment")
-
+# Rinominazione necessaria per far riconoscere ad RStudio il text field
 
 #Esportare il Campione
 #write_xlsx(Campione, "Training Data Grezzo.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
@@ -115,6 +115,7 @@ Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo",
 
 # Verifica celle vuote.
 apply(Campione, 2, function(x) sum(is.na(x)))
+# Ogni recensione ha una valutazione
 
 # Conversione in corpus con la variabile del sentiment
 Training_Corpus <- corpus(Campione)
@@ -127,7 +128,7 @@ Dfm_Training <- dfm(tokens(Training_Corpus,
                       tokens_tolower() %>% 
                       tokens_remove(c(stopwords("italian"))) %>%
                       tokens_wordstem(language = "italian")) %>%
-  dfm_trim(max_termfreq = 500)
+  dfm_trim(max_termfreq = 500) # I Brand abbassavano l'accuracy
 
 Dfm_Training <- Dfm_Training[,!(colnames(Dfm_Training) %in% Parole_Brutte)]
 
@@ -154,13 +155,16 @@ Dfm_Test <- dfm_match(Dfm_Test,
 
 # Verifica
 setequal(featnames(Dfm_Training), 
-         featnames(Dfm_Test)) 
+         featnames(Dfm_Test))
+
 # Creazione matrici per gli algoritmi
 Matrice_Training <- as.matrix(Dfm_Training)
 Matrice_Test <- as.matrix(Dfm_Test)
 
 # Conversione del vettore sentiment in factor
 Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
+
+# 2.2: TRAINING E CLASSIFICAZIONE (training e prediction) ----
 
 # ALGORITMO NAIVE BAYES
 set.seed(123)
@@ -177,6 +181,7 @@ Test_predictedNB <- predict(NaiveBayesModel,
 # frequenze assolute sui 3400 testi del test
 table(Test_predictedNB)
 
+
 # ALGORITMO RANDOM FOREST
 set.seed(150)
 RF <- randomForest(y= Dfm_Training@docvars$sentiment,
@@ -184,18 +189,19 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    importance=TRUE,
                    do.trace=FALSE,
                    ntree=500)
-RF
+RF # Error rate: 31%
 table(Campione$sentiment)
 
-plot(RF, type = "l", col = c("black", "steelblue4","violetred4", "springgreen4"),
-     main = "Random Forest Model Errors: sentiment variable") +
-  legend("topright", horiz = F, cex = 0.7,
-       fill = c("springgreen4", "black", "steelblue4", "violetred4"),
-       c("Positive error", "Average error", "Negative error", "Neutral error"))
-
+# Linee NON tratteggiate
+  plot(RF, type = "l", col = c("black", "steelblue4", "violetred4", "springgreen4"), lty = 1,
+       main = "Errori del modello Random Forest: variabile sentiment") +   
+  legend("topright", horiz = FALSE, cex = 0.7, title = "Errori:",       
+         fill = c("springgreen4", "black", "steelblue4", "violetred4"),        
+         legend = c("Positivo", "Medio", "Negativo", "Neutro"))
+  
 Errori <- as.data.frame(RF$err.rate)
 
-which.min(Errori$OOB) # 38
+which.min(Errori$OOB) # 23
 
 set.seed(150)
 RF <- randomForest(y= Dfm_Training@docvars$sentiment,
@@ -203,6 +209,7 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    importance=TRUE,
                    do.trace=FALSE,
                    ntree=23)
+RF # 28% error rate
 
 Test_predictedRF <- predict(RF, Matrice_Test ,type="class")
 table(Test_predictedRF)
@@ -245,15 +252,13 @@ ggplot(df.long,aes(algorithm,value,fill=variable))+
         axis.text= element_text(size =10, face = "italic")
   )
 
-# CROSS VALIDATION
+# 2.3: CROSS VALIDATION ----
 
 Matrice_Training2 <- Matrice_Training
 
-#Assicuiamo la replicabilità 
+ 
 set.seed(200)
-#Definiamo un oggetto k che indichi il numero di folders
 k <- 5
-#Dividiamo la matrice in k folders
 folds <- cvFolds(NROW(Matrice_Training2), K = k)
 
 for(i in 1:k){
@@ -293,14 +298,14 @@ for(i in mget(ls(pattern = "conf.mat.nb")) ) {
   
 }
 
-#guardiamo la struttura 
-str(NB_Prediction)
+str(NB_Prediction) # Si nota la presenza di NA
 NB_Prediction [is.na(NB_Prediction )] <- 0
 
 AverageAccuracy_NB <- mean(NB_Prediction[, 1] )
 AverageF1_NB<- mean(colMeans(NB_Prediction[-1] ))
-AverageAccuracy_NB
-AverageF1_NB
+AverageAccuracy_NB # 81,5%
+AverageF1_NB # 72,7%
+
 
 # RANDOM FOREST
 for(i in 1:k){
@@ -338,20 +343,18 @@ for(i in mget(ls(pattern = "conf.mat.rf")) ) {
   
 }
 
-str(RF_Predictions)
-
+str(RF_Predictions) # Presenza NA
 RF_Predictions [is.na(RF_Predictions )] <- 0
 
-#Calcoliamo i valori medi
+
 AverageAccuracy_RF <- mean(RF_Predictions[, 1] )
 AverageF1_RF<- mean(colMeans(RF_Predictions[-1] ))
 
-AverageAccuracy_RF
-AverageF1_RF
+AverageAccuracy_RF # 67,5%
+AverageF1_RF  #52,6%
 
 
 # SUPPORT VECTOR MACHINE
-
 for(i in 1:k){
   Matrice_Training <-
     Matrice_Training2 [folds$subsets[folds$which != i], ]
@@ -387,7 +390,7 @@ for(i in mget(ls(pattern = "conf.mat.sv")) ) {
   
 }
 
-str(SVM_Prediction)
+str(SVM_Prediction) # Presenza NA
 SVM_Prediction [is.na(SVM_Prediction)] <- 0
 
 
@@ -395,11 +398,11 @@ SVM_Prediction [is.na(SVM_Prediction)] <- 0
 AverageAccuracy_SVM <- mean(SVM_Prediction[, 1] )
 AverageF1_SVM<- mean(colMeans(SVM_Prediction[-1] ))
 
-AverageAccuracy_SVM
-AverageF1_SVM
+AverageAccuracy_SVM # 73%
+AverageF1_SVM # 62,2%
 
 
-# CONFRONTO
+# CONFRONTO _____ DA MIGLIORARE !!!!
 AccNB <- as.data.frame(AverageAccuracy_NB )
 colnames(AccNB)[1] <- "NB"
 
@@ -458,57 +461,57 @@ plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
   )
 
 grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
-# 3: DRIVER ANALYSIS ----
 
-# Corpus
+# 3: DRIVER ANALYSIS ----
 
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
-
-Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
-                         remove_punct = TRUE,
-                         remove_symbols = TRUE,
-                         remove_url = TRUE,
-                         remove_numbers = TRUE) %>%
-                    tokens_tolower() %>% 
-                    tokens_remove(c(stopwords("italian"))) %>%
-                    tokens_wordstem(language = "italian")) %>%
-  dfm_trim(min_termfreq = 10,
-           max_termfreq = 500,
-           min_docfreq = 2)
+# INUTILE
+#Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
+#                        remove_punct = TRUE,
+#                        remove_symbols = TRUE,
+ #                        remove_url = TRUE,
+  #                       remove_numbers = TRUE) %>%
+ #                   tokens_tolower() %>% 
+   #                 tokens_remove(c(stopwords("italian"))) %>%
+  #                  tokens_wordstem(language = "italian")) %>%
+ # dfm_trim(min_termfreq = 10,
+  #         max_termfreq = 500,
+   #        min_docfreq = 2)
   
 
 
 # RILEVAZIONE DELLE KEYWORDS
 
 # Top parole del DFM
-topfeatures(Dfm_Places,50)
+#topfeatures(Dfm_Places,50)
 
-Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
-Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
+# DA RIVEDERE
+#Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
+#Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
-ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
-  geom_point(size = 1.5, color = "Darkorange2") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=360, hjust=1)) +
-  labs(x = "Features", y = "Frequenza", 
-       title = "Le 20 parole più frequenti nelle recensioni") +
-  theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
-        plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
+#ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
+ # geom_point(size = 1.5, color = "Darkorange2") +
+  #theme_bw() +
+#  theme(axis.text.x = element_text(angle=360, hjust=1)) +
+ # labs(x = "Features", y = "Frequenza", 
+  #     title = "Le 20 parole più frequenti nelle recensioni") +
+  #theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
+   #     plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
 
-textplot_wordcloud(Dfm_Places, 
-                   min_size = 1.5,  
-                   max_size = 4,    
-                   min.count = 10,   
-                   max_words = 50,  
-                   random.order = FALSE,  
-                   random_color = FALSE,
-                   rotation = 0,    #rotazione delle parole
-                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+#textplot_wordcloud(Dfm_Places, 
+ #                  min_size = 1.5,  
+  #                 max_size = 4,    
+   #                min.count = 10,   
+    #               max_words = 50,  
+     #              random.order = FALSE,  
+      #             random_color = FALSE,
+       #            rotation = 0,    #rotazione delle parole
+        #           colors = RColorBrewer::brewer.pal(8,"Dark2"))
 
 
-
+# 3.1: KEYWORDS E DRIVER ----
 Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
                                      "economico", "concorrenziali", "sconto", 
                                      "offerta", "budget", "ragionevole","costo", "sostenibile", 
@@ -546,25 +549,23 @@ stem_words <- function(words) {
   return(stemmed_words)
 }
 
-str(Driver)
 Driver$prezzo <- stem_words(Driver$prezzo)
 Driver$servizio <- stem_words(Driver$servizio)
 Driver$ordini <- stem_words(Driver$ordini)
 Driver$location <- stem_words(Driver$location)
 
 Driver_Review <- dfm_lookup(Dfm_Totale,Driver)
-Driver_Review
 
 Driver_Conv_Rev <- convert(Driver_Review, to = "data.frame")
 Driver_Conv_Rev <- cbind(ID = Dfm_Totale@docvars$ID, Driver_Conv_Rev)
 
 apply(Driver_Conv_Rev[,3:6],2,sum)
-prop.table(apply(Driver_Conv_Rev[,3:6],2,sum)) # da sistemare
+prop.table(apply(Driver_Conv_Rev[,3:6],2,sum))
 
 
 DriverAnalysis <- full_join(Ita_StoresReview, Driver_Conv_Rev)
 
-# SENTIMENT ANALYSIS
+# 3.2: SENTIMENT ANALYSIS ----
 
 Dizionario <- get_sentiment_dictionary(dictionary = 'nrc', 
                                        language = "italian")
@@ -594,7 +595,7 @@ ggplot(RatingXsentiment,aes(Rating, Freq, fill=Sentiment))+
         axis.title=element_text(size=10,face="plain"),
         axis.text= element_text(size =10, face = "italic"))
 
-# EMOTION ANALYSIS
+# 3.3: EMOTION ANALYSIS ----
 
 EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
 
@@ -608,13 +609,7 @@ barplot(
 )
 
 
-# NEWSMAP
-
-DriverAnaylisis_SemiSupervisedApproach <- dfm(Corpus_Totale, 
-                                            remove_number = TRUE,  
-                                            tolower = TRUE,
-                                            stem = TRUE,
-                                            dictionary = Driver)
+# 3.4: NEWSMAP ----
 
 DriverAnalysis_SemiSupervisedApproach <- dfm(tokens(Corpus_Totale,
                          remove_punct = TRUE,
