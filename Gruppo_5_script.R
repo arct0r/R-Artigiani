@@ -26,6 +26,7 @@ library(caret)
 library(ggplot2)
 library(gridExtra)
 library(quanteda.textplots)
+# Tabelle
 library(kableExtra)
 library(flextable)
 library(officer)
@@ -41,15 +42,14 @@ StoresReview <- cbind(ID = seq(1:nrow(StoresReview)), StoresReview)
 
 table(StoresReview$lang_value) # Presenza di altre lingue
 
+# Decidiamo di prendere in considerazione solo le recensioni in ITALIANO.
+
 # Eliminiamo le recensioni vuote e manteniamo solo quelle in lingua italiana.
 Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
                                     is.na(StoresReview$lang_value) == TRUE) & 
                                    is.na(StoresReview$text) == FALSE,]
 # Putroppo l'algoritmo di deeplearning ha assegnato valori in lang_value 
 # diversi da it e NA anche a delle recensioni in italiano, quindi li elimina.
-
-table(Ita_StoresReview$social)
-# Si nota che nel dataset, le recensioni provengono solo da twitter e places.
 
 # Creazione corpus
 Corpus_Totale <- corpus(Ita_StoresReview)
@@ -68,18 +68,26 @@ Dfm_Totale <- dfm(tokens(Corpus_Totale,
            min_docfreq = 2)
 
 # Raggruppiamo i tag e gli hashtag
-Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))] 
-# Li togliamo
+Parole_Brutte <- colnames(Dfm_Totale)[grepl("^\\s*[#@]", trimws(colnames(Dfm_Totale)))]
+
+# Li togliamo perché non ci saranno utili nell'analisi
 Dfm_Totale <- Dfm_Totale[,!(colnames(Dfm_Totale) %in% Parole_Brutte)]
+
+# check
+dim(Dfm_Totale) # 3622 testi e 869 features
 
 # 2: ANALISI DEL SENTIMENT CON GLI ALGORITMI ----
 
-# Campionamento con numerosità 200
-# La qualità delle recensioni di places è superiore rispetto a quelle di twitter,
-# Quindi abbiamo deciso di suddivere le due tipologie, prendendo 80% da places
-# e il 20 % da twitter
+table(Ita_StoresReview$social)
+# Si nota che nel dataset, le recensioni provengono solo da twitter e places.
+# Si nota che la qualità delle recensioni di places è superiore rispetto a quelle di twitter,
+
+# Quindi nell'estrazione del campione con numerosità 200,
+# abbiamo deciso di suddivere le due tipologie prendendo 80% da places e il 20 % da twitter.
 
 # 2.1: PREPARAZIONE DEI DATI (training, test, matrici) ----
+
+# Campionamento
 set.seed(001)
 Training_places <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
                           size = 160,
@@ -97,19 +105,20 @@ Test_Corpus <- Corpus_Totale[!(Corpus_Totale %in% Training_Corpus)]
 
 # Verifica se sono complementari
 setequal(Corpus_Totale, union(Test_Corpus, Training_Corpus))
-# Risposta affermativa, ma si nota una differenza di 21 testi
+# Risposta affermativa, ma si nota una differenza di 22 testi
 
-# Dataset del Campione per poterlo esportare
+# Dataframe del Campione per poterlo esportare
 Campione <- data.frame(
   ID = attr(Training_Corpus, "docvars")$ID,
   persona <- rep(c("William","Davide","Maddalena","Giacomo"),each = 50),
   Training_Corpus,
-  sentiment <- NA)
+  sentiment <- NA) # facilita le verifica dopo
 names(Campione) <- c("ID","Persona","text","sentiment")
 # Rinominazione necessaria per far riconoscere ad RStudio il text field
 
 #Esportare il Campione
 #write_xlsx(Campione, "Training Data Grezzo.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
+# Importo
 Campione <- read_excel("Training Data Grezzo.xlsx")
 
 Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo", 
@@ -123,6 +132,7 @@ apply(Campione, 2, function(x) sum(is.na(x)))
 # Conversione in corpus con la variabile del sentiment
 Training_Corpus <- corpus(Campione)
 
+# Otteniamo le dfm per training e test "senza" trimming
 Dfm_Training <- dfm(tokens(Training_Corpus,
                            remove_punct = TRUE,
                            remove_symbols = TRUE,
@@ -183,7 +193,6 @@ Test_predictedNB <- predict(NaiveBayesModel,
 
 # frequenze assolute sui 3400 testi del test
 table(Test_predictedNB)
-Test_predictedNB
 
 # ALGORITMO RANDOM FOREST
 set.seed(150)
@@ -191,21 +200,23 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    x= Matrice_Training,
                    importance=TRUE,
                    do.trace=FALSE,
-                   ntree=500)
+                   ntree=500) # numero standard
 RF # Error rate: 31%
-table(Campione$sentiment)
 
-# Linee NON tratteggiate
+
   plot(RF, type = "l", col = c("black", "steelblue4", "violetred4", "springgreen4"), lty = 1,
        main = "Errori del modello Random Forest: variabile sentiment") +   
   legend("topright", horiz = FALSE, cex = 0.7, title = "Errori:",       
          fill = c("springgreen4", "black", "steelblue4", "violetred4"),        
          legend = c("Positivo", "Medio", "Negativo", "Neutro"))
-  
+
+# Salvo tutti gli errori relativi al numero dei trees
 Errori <- as.data.frame(RF$err.rate)
 
+# Identifico il PRIMO numero di ntrees con l'errore minimo
 which.min(Errori$OOB) # 23
 
+# Rifacciamo con ntree = 23
 set.seed(150)
 RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    x= Matrice_Training,
@@ -215,6 +226,7 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
 RF # 28% error rate
 
 Test_predictedRF <- predict(RF, Matrice_Test ,type="class")
+
 table(Test_predictedRF)
 
 # SUPPORT VECTOR
@@ -229,14 +241,7 @@ Test_predictedSV <- predict(SupportVectorMachine, Matrice_Test)
 
 table(Test_predictedSV)
 
-Confronto_test <- data.frame(
-  ID = attr(Test_Corpus, "docvars")$ID,
-  social = attr(Test_Corpus, "docvars")$social,
-  Test_Corpus,
-  Test_predictedNB,
-  Test_predictedRF,
-  Test_predictedSV)
-
+# frequenze relative dei diversi algoritmi
 results <- as.data.frame(rbind(prop.table(table(Test_predictedNB)),
                                prop.table(table(Test_predictedRF)),
                                prop.table(table(Test_predictedSV))))
@@ -245,8 +250,9 @@ results$algorithm <- c("Naive Bayes", "Random Forest", "Support Vector Machine")
 
 df.long<-melt(results,id.vars=c("algorithm"))
 
+# Grafico che compara i risultati dei tre algoritmi
 ggplot(df.long,aes(algorithm,value,fill=variable))+
-  geom_bar(position="dodge",stat="identity") + scale_fill_manual(values = c("violetred3", "yellow3", "orange2")) +
+  geom_bar(position="dodge",stat="identity") + scale_fill_manual(values = c("red", "yellow2", "darkgreen")) +
   labs(title = "Comparazione delle predizioni") +
   theme(axis.text.x = element_text(color="#993333", angle=90)) + coord_flip() +
   ylab(label="Proporzione delle categorie nel test set") + xlab("Algoritmi") +
@@ -257,6 +263,8 @@ ggplot(df.long,aes(algorithm,value,fill=variable))+
   )
 
 # 2.3: CROSS VALIDATION ----
+
+# Abbiamo i tre risultati, capiamo quale algoritmo performa meglio
 
 Matrice_Training2 <- Matrice_Training
 
@@ -307,6 +315,7 @@ NB_Prediction [is.na(NB_Prediction )] <- 0
 
 AverageAccuracy_NB <- mean(NB_Prediction[, 1] )
 AverageF1_NB<- mean(colMeans(NB_Prediction[-1] ))
+# ACCURACY BAYES
 AverageAccuracy_NB # 81,5%
 AverageF1_NB # 72,7%
 
@@ -353,7 +362,7 @@ RF_Predictions [is.na(RF_Predictions )] <- 0
 
 AverageAccuracy_RF <- mean(RF_Predictions[, 1] )
 AverageF1_RF<- mean(colMeans(RF_Predictions[-1] ))
-
+# ACCURACY RANDOM FOREST
 AverageAccuracy_RF # 67,5%
 AverageF1_RF  #52,6%
 
@@ -402,6 +411,7 @@ SVM_Prediction [is.na(SVM_Prediction)] <- 0
 AverageAccuracy_SVM <- mean(SVM_Prediction[, 1] )
 AverageF1_SVM<- mean(colMeans(SVM_Prediction[-1] ))
 
+# ACCURACY SUPPORT VECTOR MACHINE
 AverageAccuracy_SVM # 73%
 AverageF1_SVM # 62,2%
 
@@ -422,10 +432,12 @@ colnames(AccSVM)[1] <- "SVM"
 
 #Unisco in un unico dataframe i valori di accuracy dei tre modelli
 Accuracy_models <- cbind(AccNB, AccRF, AccSVM)
-Accuracy_models
+
+Accuracy_models # Accuracy Bayes superiore
 
 Accuracy_models_Melt <-melt(Accuracy_models)
 
+# Si salva il primo grafico per il gird arrange
 plot_accuracy <- ggplot(Accuracy_models_Melt, aes(x=variable, y=value, color = variable)) +
   geom_boxplot() + xlab("Algorithm") + ylab(label="Values of accuracy") +
   labs(title = "Cross-validation with k =5: values of accuracy") + coord_flip() +
@@ -447,11 +459,12 @@ F1SVM <- as.data.frame(AverageF1_SVM)
 colnames(F1SVM)[1] <- "SVM"
 #DATAFRAME
 f1_models <- cbind(F1NB, F1RF, F1SVM)
-f1_models
+f1_models # F1 score di Bayes superiore
 
 f1_models_melt <-melt(f1_models)
 str(f1_models_melt)
 
+# Si salva il secondo grafico
 plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
   geom_boxplot() + xlab("Algorithm") + ylab(label="Values of f1") +
   labs(title = "Cross-validation with k =5: values of f1") + coord_flip() +
@@ -464,8 +477,8 @@ plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
   )
 
 grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
-str(Test_Corpus)
 
+# Creo dataframe che salva le predizioni dei tre algoritmi.
 Esiti_algo_Test <- data.frame(
   ID = attr(Test_Corpus, "docvars")$ID,
   social = attr(Test_Corpus, "docvars")$social,
@@ -475,27 +488,29 @@ Esiti_algo_Test <- data.frame(
   SVM = Test_predictedSV
 )
 
+# Risultati dell'algoritmo vincitore 
 Df_sentiment <- data.frame(
   ID = c(Training_Corpus$ID, Test_Corpus$ID),
   NB_sentiment = c(Campione$sentiment, as.vector(Test_predictedNB))
 )
 
+# Mettiamo il sentiment nel dataframe di partenza
 Ita_StoresReview <- merge(Ita_StoresReview, Df_sentiment, by='ID')
 
+# Abbiamo voluto campionare una sessantina di testi nel test set
+# per rifare l'analisi manuale e fare una stima dell'accuratezza dei tre algoritmi
 set.seed(007)
-AAP_test_data_places <- Confronto_test %>%
+AAP_test_data_places <- Esiti_algo_Test %>%
   filter(social == 'places') %>%
   slice_sample(n=40, replace = FALSE)
 # Con questo codice estraggo 40 random samples dal testing data con social == places
 
 set.seed(007)
-AAP_test_data_twitter <- Confronto_test %>%
+AAP_test_data_twitter <- Esiti_algo_Test %>%
   filter(social == 'twitter') %>%
   slice_sample(n=20, replace = FALSE)
 
-# AAP_test_data <- rbind(AAP_test_data_places, AAP_test_data_twitter)
-# Esporto i due dataframe. Perchè non li unisco? Perchè questo linguaggio è SPAZZATURA e da errori strani.
-# Farò il bind manuale su excel
+# Faremo il bind manuale su excel
 #write_xlsx(AAP_test_data_places, 'aap_sample_places.xlsx')
 #write_xlsx(AAP_test_data_twitter, 'aap_sample_twitter.xlsx')
 
@@ -508,6 +523,7 @@ AAP_confronto <- c(Bayes = sum(AAP_test_data$Test_predictedNB == AAP_test_data$h
                    RF = sum(AAP_test_data$Test_predictedRF == AAP_test_data$human_val),
                    SV = sum(AAP_test_data$Test_predictedSV == AAP_test_data$human_val))
 
+# Dataframe che contiene freq assoluta e relativa sull'analisi manuale effettuata sul campione del test set.
 AAP_confronto <- data.frame(
   Bayes = c(sum(AAP_test_data$Test_predictedNB == AAP_test_data$human_val),
             sum(AAP_test_data$Test_predictedNB == AAP_test_data$human_val)/60*100),
@@ -524,8 +540,10 @@ rownames(AAP_confronto) <- c("Freq Assoluta", "Freq Relativa")
 
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
+# Notiamo presenza di emoji, tag, urls e altri elementi disturbanti per l'analisi
 
-  
+# Abbiamo voluto prendere in considerazione solo le recensioni di places
+# per individuare i possibili driver del dataset.
 Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
                          remove_punct = TRUE,
                          remove_symbols = TRUE,
@@ -543,7 +561,7 @@ Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
 # Top parole del DFM
 topfeatures(Dfm_Places,50)
 
-# DA RIVEDERE
+# Vogliamo rappresentare le top 50 sui grafici
 Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
 Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
@@ -551,8 +569,8 @@ ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
  geom_point(size = 1.5, color = "Darkorange2") +
   theme_bw() +
 theme(axis.text.x = element_text(angle=360, hjust=1)) +
-labs(x = "Features", y = "Frequenza", 
-      title = "Le 20 parole più frequenti nelle recensioni") +
+labs(x = "Frequenza", y = "Features", 
+      title = "Le 50 parole più frequenti nelle recensioni") +
   theme(plot.title = element_text(color = "Darkorange2", size = 11, face = "bold"),
         plot.subtitle = element_text(color = "black", size = 11, face = "italic" ))
 
@@ -565,9 +583,13 @@ textplot_wordcloud(Dfm_Places,
                    random_color = FALSE,
                    rotation = 0,    #rotazione delle parole
                    colors = RColorBrewer::brewer.pal(8,"Dark2"))
-
+# Abbiamo individuato 4 possibili driver: Prezzo, Servizio, Ordini e Location
 
 # 3.1: KEYWORDS E DRIVER ----
+
+# Verrà usato sia per il dizionario che per il semi-supervisionato
+# Abbiamo generato delle ulteriori keywords di contesto
+
 Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
                                      "economico", "concorrenziali", "sconto", 
                                      "offerta", "budget", "ragionevole","costo", "sostenibile", 
@@ -600,6 +622,7 @@ Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "pre
                                        "illuminata", "spazio", "facile", 
                                        "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato", "bell", "ben")))
 
+# Funzione che applicherà lo stemming sulle keywords del driver
 stem_words <- function(words) {
   stemmed_words <- wordStem(words, language = "italian")
   return(stemmed_words)
@@ -615,8 +638,8 @@ Driver_Review <- dfm_lookup(Dfm_Totale,Driver)
 Driver_Conv_Rev <- convert(Driver_Review, to = "data.frame")
 Driver_Conv_Rev <- cbind(ID = Dfm_Totale@docvars$ID, Driver_Conv_Rev)
 
-apply(Driver_Conv_Rev[,3:6],2,sum)
-prop.table(apply(Driver_Conv_Rev[,3:6],2,sum))
+apply(Driver_Conv_Rev[,3:6],2,sum) # Numero di testi etichettati per driver
+prop.table(apply(Driver_Conv_Rev[,3:6],2,sum)) # Distribuzione dei driver
 
 
 DriverAnalysis <- full_join(Ita_StoresReview, Driver_Conv_Rev)
@@ -633,6 +656,7 @@ DriverAnalysis$sentimentAnalysis <- Store_reviews_sentiment
 
 DriverAnalysis$sentiment_labels <- ifelse(DriverAnalysis$sentimentAnalysis <= 0, "Negativo", "Positivo")
 
+# GGrafico che dati i 5 livelli di rating mostra la suddivisione nel sentiment
 RatingXsentiment <- table(DriverAnalysis$sentiment_labels, DriverAnalysis$score_rating)
 RatingXsentiment <- as.data.frame(RatingXsentiment)
 colnames(RatingXsentiment) <- c("Sentiment","Rating","Freq")
@@ -640,12 +664,12 @@ colnames(RatingXsentiment) <- c("Sentiment","Rating","Freq")
 ggplot(RatingXsentiment,aes(Rating, Freq, fill=Sentiment))+
   geom_bar(position="stack",stat="identity") +   
   scale_fill_manual(values = c("#CA3432", "darkseagreen")) +
-  labs(title = "Come cambia il valore del sentiment al variare del rating?") +
+  labs(title = "Sentiment rispetto al rating") +
   theme(axis.text.x = element_text(color="#993333", angle=90)) + 
   coord_flip() +
-  ylab(label="Valori assoluti") + 
+  ylab(label="Frequenza assoluta") + 
   xlab("Rating") +
-  guides(fill=guide_legend(title="sentiment")) +
+  guides(fill=guide_legend(title="Sentiment:")) +
   theme(plot.title = element_text(color = "black", size = 12, face = "plain"),
         plot.subtitle = element_text(face = "plain"),
         axis.title=element_text(size=10,face="plain"),
@@ -655,6 +679,7 @@ ggplot(RatingXsentiment,aes(Rating, Freq, fill=Sentiment))+
 
 EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
 
+# Grafico che mostra le emozioni rilevate e la loro distribuzione
 barplot(
   sort(colSums(prop.table(EmotionAnalysis[, 1:8]))), 
   horiz = TRUE, 
@@ -680,7 +705,8 @@ TextModel <- textmodel_newsmap(Dfm_Totale,
                                DriverAnalysis_SemiSupervisedApproach)
 
 DriverAnalysis$SemiSupervised <- predict(TextModel)
-round(prop.table(table(predict(TextModel))), 2)*100
+
+round(prop.table(table(predict(TextModel))), 2)*100 # % driver nel dataset
 
 DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
                                     ifelse(DriverAnalysis$servizio > 0, "Servizio",
@@ -688,27 +714,36 @@ DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
                                                   ifelse(DriverAnalysis$location > 0, "Location", "NA"))))
 
 ConfrontoRisultati <- filter(DriverAnalysis, Dizionario == "NA")
+# Colonna inutile 
 DriverAnalysis$doc_id <- NULL
 
 # 4 ----
 
-DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE,]
+apply(DriverAnalysis, 2, function(x) sum(is.na(x)))
+# Vogliamo basarci sui risultati dell'algoritmo semi-supervisionato,
+# ma si nota la presenza di NA nelle colonne Player e del semi-supervisionato
+DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE &
+                                   is.na(DriverAnalysis$Player) == FALSE,]
 
 # TABELLA GENERALE
+# Recensioni, rating e sentiment in base al brand
 Generale <- DriverAnalysis %>%
   group_by(Player) %>%
-  summarise(n_rev = length(text),
+  summarise(n_rec = length(text),
             media_rating = round(mean(score_rating,na.rm = TRUE),2),
             media_sentiment = round(mean(sentimentAnalysis),2))
 
+# Pre ottenere una tabella a colori abbiamo usato una funzione alternativa
 Generale_ft <- flextable(Generale)
 
 Generale_ft |>
   bg(j = c("media_rating","media_sentiment"), 
      bg = scales::col_quantile(palette = c("wheat", "red"), domain =NULL))
+# Colora in base al peso del valore
 
 # TABELLA DRIVER SENTIMENT
 
+# L'obiettivo è di "ripetere" 4 volte la tabella di prima, ma relativi ai singoli driver
 for (i in levels(DriverAnalysis$SemiSupervised)){
   
   df_i <- DriverAnalysis %>%
@@ -722,9 +757,9 @@ for (i in levels(DriverAnalysis$SemiSupervised)){
   
  Generale <- inner_join(Generale,summary_i,
                            by = "Player")
-}
+} # Si appicica a destra della tabella precedente per avere una paronamica su tutti i driver
 
-# Modifico i nomi delle colonne per renderli più leggibili ed uniformarli
+
 names(Generale) <- c("Player", rep(c("Numero reviews","Media score","Media sentiment"),
                                      length(levels(DriverAnalysis$SemiSupervised))+1))
 
@@ -738,12 +773,11 @@ kbl(Generale) %>%
   column_spec(c(3,6,9,12,15), color = "white",
               background = spec_color(Generale$`Media score`, end =1, palette = c("red", "orange","green"))) %>%
   add_header_above(c(" " = 1," Generale" = 3, "Prezzo" = 3,"Servizio" = 3,"Ordini" = 3,"Location" = 3))
+
 # GRAFICI
 
 # check
 table(Ita_StoresReview$score_rating, Ita_StoresReview$NB_sentiment)
-
-
 
 # DISTRIBUZIONE SENTIMENT PER BRAND
 Brand_sentiment <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment))
@@ -808,14 +842,15 @@ legend("topright", legend = c("Basso", "Medio", "Alto"), fill = c("blue", "white
 
 # GRAFICI 
 
-apply(DriverAnalysis, 2, function(x) sum(is.na(x)))
 
-
-Mediaworld_driver <- DriverAnalysis[DriverAnalysis$Player == "Mediaworld",c(14,15)]
-Unieuro_driver <- DriverAnalysis[DriverAnalysis$Player == "Unieuro",c(14,15)]
-Euronics_driver <- DriverAnalysis[DriverAnalysis$Player == "Euronics",c(14,15)]
+# TORTE PER OGNI BRAND CHE MOSTRA LA DISTRIBUZIONE DEI DRIVER
+Mediaworld_driver <- DriverAnalysis[DriverAnalysis$Player == "Mediaworld",c(15,16)]
 Mediaworld_driver <- as.data.frame(table(Mediaworld_driver$sentiment_labels, Mediaworld_driver$SemiSupervised))
+
+Unieuro_driver <- DriverAnalysis[DriverAnalysis$Player == "Unieuro",c(15,16)]
 Unieuro_driver <- as.data.frame(table(Unieuro_driver$sentiment_labels, Unieuro_driver$SemiSupervised))
+
+Euronics_driver <- DriverAnalysis[DriverAnalysis$Player == "Euronics",c(15,16)]
 Euronics_driver <- as.data.frame(table(Euronics_driver$sentiment_labels, Euronics_driver$SemiSupervised))
 
 Mediaworld_driver <- rename(
@@ -883,3 +918,4 @@ ggplot(Euronics_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
         axis.title=element_text(size=10,face="plain"),
         axis.text= element_text(size =10, face = "italic"),
         axis.text.x = element_text(color="#993333", angle=45))
+
