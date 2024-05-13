@@ -893,20 +893,22 @@ Paragrafo che spieghi il grafico
 
 ```{r}
 
-EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
+# EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
 
 # Grafico che mostra le emozioni rilevate e la loro distribuzione
-barplot(
-  sort(colSums(prop.table(EmotionAnalysis[, 1:8]))), 
-  horiz = TRUE, 
-  cex.names = 0.7, 
-  las = 1, 
-  main = "Le emozioni nel corpus", xlab="Proporzioni",
-  col = "#8C96C6"
-)
+#barplot(
+ # sort(colSums(prop.table(EmotionAnalysis[, 1:8]))), 
+  #horiz = TRUE, 
+  #cex.names = 0.7, 
+  #las = 1, 
+  #main = "Le emozioni nel corpus", xlab="Proporzioni",
+  #col = "#8C96C6"
+#)
 
 
 ```
+
+![EmotionAnalysis](emotion.png)
 
 Qualche commento su sto grafico
 
@@ -1148,7 +1150,6 @@ ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
         axis.title=element_text(size=10,face="plain"),
         axis.text= element_text(size =10, face = "italic"),
         axis.text.x = element_text(color="#993333", angle=45))
-
 ```
 
 ```{r}
