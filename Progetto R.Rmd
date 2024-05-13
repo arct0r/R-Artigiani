@@ -10,7 +10,7 @@ output:
       collapsed: true
 ---
 
-```{r setup, include=FALSE} 
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
@@ -250,7 +250,7 @@ Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
 
 ## 2.2 Training e classificazione
 
-``` {r}
+```{r}
 
 # ALGORITMO NAIVE BAYES
 set.seed(123)
@@ -268,7 +268,7 @@ Test_predictedNB <- predict(NaiveBayesModel,
 table(Test_predictedNB)
 ```
 
-``` {r}
+```{r}
 
 # ALGORITMO RANDOM FOREST
 set.seed(150)
@@ -281,7 +281,6 @@ RF # Error rate: 31%
 
 ```
 
-
 ```{r}
 #  plot(RF, type = "l", col = c("black", "steelblue4", "violetred4", "springgreen4"), lty = 1,
 #       main = "Errori del modello Random Forest: variabile sentiment") +   
@@ -290,13 +289,13 @@ RF # Error rate: 31%
 #         legend = c("Positivo", "Medio", "Negativo", "Neutro"))
 
 ```
+
 ```{r}
 #install.packages('EBImage')
 #library(EBImage)
 #fig <- plot_ly(type="image", z=readImage('RFPlot.png')*255)
 #fig
 ```
-
 
 ```{r}
 # Salvo tutti gli errori relativi al numero dei trees
@@ -332,10 +331,9 @@ table(Test_predictedSV)
 
 ```
 
-Abbiamo allenato 3 diversi algoritmi sul nostro training data con il sentiment manuale. 
-Bayes, Random Forest e Support Vector Machine. Questo è un sample del loro risultato. In seguito analizzeremo piu' a fondo le loro performances attraverso il processo di cross validation.
+Abbiamo allenato 3 diversi algoritmi sul nostro training data con il sentiment manuale. Bayes, Random Forest e Support Vector Machine. Questo è un sample del loro risultato. In seguito analizzeremo piu' a fondo le loro performances attraverso il processo di cross validation.
 
-``` {r}
+```{r}
 
 
 # frequenze relative dei diversi algoritmi
@@ -360,14 +358,14 @@ ggplot(df.long,aes(algorithm,value,fill=variable))+
   )
 
 ```
-Wow! Che sta succedendo qui? I nostri algoritmi stanno dando valutazioni completamente diverse!
-Quale sarà il migliore?
+
+Wow! Che sta succedendo qui? I nostri algoritmi stanno dando valutazioni completamente diverse! Quale sarà il migliore?
 
 ## 2.3 Cross validation
 
 Per la cross validation abbiamo scelto un k=5.
 
-``` {r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide',message=FALSE}
 
 # Abbiamo i tre risultati, capiamo quale algoritmo performa meglio
 
@@ -424,16 +422,17 @@ AverageF1_NB<- mean(colMeans(NB_Prediction[-1] ))
 
 è arrivata l'ora di testare la star, Naive Bayes. Come si comporterà il nostro eroe?
 
-``` {r}
+```{r}
 
 # ACCURACY BAYES
 AverageAccuracy_NB # 81,5%
 AverageF1_NB # 72,7%
 
 ```
-**Wow!!!!!!!!!!!!** 81%. Un risultato strabiliante. 
 
-``` {r echo=FALSE, results='hide',message=FALSE}
+**Wow!!!!!!!!!!!!** 81%. Un risultato strabiliante.
+
+```{r echo=FALSE, results='hide',message=FALSE}
 
 # RANDOM FOREST
 for(i in 1:k){
@@ -482,7 +481,7 @@ AverageF1_RF<- mean(colMeans(RF_Predictions[-1] ))
 
 Nonostante abbiamo diminuito il numero di trees l'accuracy risulta inferiore rispetto a Bayes.
 
-``` {r}
+```{r}
 
 # ACCURACY RANDOM FOREST
 AverageAccuracy_RF # 67,5%
@@ -490,7 +489,7 @@ AverageF1_RF  #52,6%
 
 ```
 
-``` {r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide',message=FALSE}
 
 # SUPPORT VECTOR MACHINE
 for(i in 1:k){
@@ -538,10 +537,9 @@ AverageF1_SVM<- mean(colMeans(SVM_Prediction[-1] ))
 
 ```
 
-Ci risulta l`utilizzo di 173 support vectors.
-L`accuracy del support Vector Machine si posiziona tra Bayes e Random Forest.
+Ci risulta l`utilizzo di 173 support vectors. L`accuracy del support Vector Machine si posiziona tra Bayes e Random Forest.
 
-``` {r}
+```{r}
 
 
 # ACCURACY SUPPORT VECTOR MACHINE
@@ -550,8 +548,7 @@ AverageF1_SVM # 62,2%
 
 ```
 
-
-``` {r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide',message=FALSE}
 
 # CONFRONTO
 AccNB <- as.data.frame(AverageAccuracy_NB )
@@ -615,16 +612,18 @@ plot_f1 <- ggplot(f1_models_melt, aes(x=variable, y=value, color = variable)) +
 
 ```
 
-``` {r}
+```{r}
 
 
 grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
 
 ```
 
-Abbiamo determinato quale fosse l'algoritmo piu' performante basandoci sull'accuratezza e su f1. Bayes risulta il piu' performante. 
+Abbiamo determinato quale fosse l'algoritmo piu' performante basandoci sull'accuratezza e su f1. Bayes risulta il piu' performante.
 
-``` {r echo=FALSE, results='hide',message=FALSE}
+![](f1%20bayes.png)
+
+```{r echo=FALSE, results='hide',message=FALSE}
 
 
 # Creo dataframe che salva le predizioni dei tre algoritmi.
@@ -654,9 +653,7 @@ Ita_StoresReview <- merge(Ita_StoresReview, Df_sentiment, by='ID')
 
 Abbiamo estratto un campione di testi (60 testi) dal testing data e li abbiamo recensiti manualmente. Abbiamo posizionato queste recensioni di fianco a quelle degli algoritmi.
 
-
-
-``` {r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide',message=FALSE}
 
 # Abbiamo voluto campionare una sessantina di testi nel test set
 # per rifare l'analisi manuale e fare una stima dell'accuratezza dei tre algoritmi
@@ -698,7 +695,7 @@ AAP_confronto <- data.frame(
 rownames(AAP_confronto) <- c("Freq Assoluta", "Freq Relativa")
 ```
 
-``` {r}
+```{r}
 
 kbl(AAP_test_data[1:10, ], longtable = T, booktabs = T, 
     caption = "Dataset Negozi di Elettronica, Recensioni") %>%
@@ -709,9 +706,9 @@ kbl(AAP_test_data[1:10, ], longtable = T, booktabs = T,
 
 ```
 
-Abbiamo infine calcolato l`accuracy di tutti e tre gli algoritmi in questo campione. Queste sono state le performances:
+Abbiamo infine calcolato l\`accuracy di tutti e tre gli algoritmi in questo campione. Queste sono state le performances:
 
-``` {r}
+```{r}
 
 round(AAP_confronto[2,],2)
 
@@ -719,13 +716,11 @@ round(AAP_confronto[2,],2)
 
 Rispetto alla cross validation Bayes rimane il piu' performante ma ha comunque registrato un calo di prestazioni. Essendo la stragrande maggioranza dei tweets inutili sarebbe interessante capire come il quantitativo di questi nel campione influenza l'accuracy. La presenza dei tweet riduce o aumenta l'accuracy? Ci porteremo questo dubbio nella tomba.
 
-
 # 3. Driver Analysis
 
 Frequenze delle caratteristiche del Corpus
 
-
-``` {r}
+```{r}
 
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
@@ -733,8 +728,7 @@ apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 
 Notiamo la presenza di emoji, tag, urls e altri elementi disturbanti per l'analisi.
 
-
-``` {r}
+```{r}
 
 
 # Abbiamo voluto prendere in considerazione solo le recensioni di places
@@ -755,7 +749,7 @@ Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
 
 RILEVAZIONE DELLE KEYWORDS
 
-``` {r}
+```{r}
 
 # Vogliamo rappresentare le top 50 sui grafici
 Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
@@ -772,7 +766,7 @@ labs(x = "Frequenza", y = "Features",
 
 ```
 
-``` {r message=FALSE}
+```{r message=FALSE}
 
 textplot_wordcloud(Dfm_Places, 
                   min_size = 1.5,  
@@ -788,7 +782,7 @@ textplot_wordcloud(Dfm_Places,
 
 ## 3.1 Scelta delle Keywords e Driver
 
-``` {r}
+```{r}
 
 
 # Verrà usato sia per il dizionario che per il semi-supervisionato
@@ -834,8 +828,7 @@ stem_words <- function(words) {
 
 ```
 
-
-``` {r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide',message=FALSE}
 
 Driver$prezzo <- stem_words(Driver$prezzo)
 Driver$servizio <- stem_words(Driver$servizio)
@@ -846,8 +839,7 @@ Driver_Review <- dfm_lookup(Dfm_Totale,Driver)
 
 ```
 
-
-``` {r}
+```{r}
 
 Driver_Conv_Rev <- convert(Driver_Review, to = "data.frame")
 Driver_Conv_Rev <- cbind(ID = Dfm_Totale@docvars$ID, Driver_Conv_Rev)
@@ -862,8 +854,7 @@ DriverAnalysis <- full_join(Ita_StoresReview, Driver_Conv_Rev)
 
 ## 3.2 Sentiment Analysis
 
-
-``` {r}
+```{r}
 
 Dizionario <- get_sentiment_dictionary(dictionary = 'nrc', 
                                        language = "italian")
@@ -900,7 +891,7 @@ Paragrafo che spieghi il grafico
 
 ## 3.3 Emotion Analysis
 
-``` {r}
+```{r}
 
 EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
 
@@ -916,6 +907,7 @@ barplot(
 
 
 ```
+
 Qualche commento su sto grafico
 
 ## 3.4 Newsmap
@@ -940,7 +932,7 @@ DriverAnalysis$SemiSupervised <- predict(TextModel)
 
 ```
 
-``` {r}
+```{r}
 round(prop.table(table(predict(TextModel))), 2)*100 # % driver nel dataset
 
 DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
@@ -953,10 +945,9 @@ ConfrontoRisultati <- filter(DriverAnalysis, Dizionario == "NA")
 DriverAnalysis$doc_id <- NULL
 ```
 
-
 # 4. Conclusioni e considerazioni
 
-``` {r}
+```{r}
 
 
 apply(DriverAnalysis, 2, function(x) sum(is.na(x)))
@@ -968,7 +959,7 @@ DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE &
 
 ## 4.1 Conclusioni generali
 
-``` {r}
+```{r}
 
 
 # TABELLA GENERALE
@@ -989,7 +980,7 @@ Generale_ft |>
 
 ```
 
-``` {r}
+```{r}
 # DISTRIBUZIONE SENTIMENT PER BRAND
 Brand_sentiment <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment))
 
@@ -1017,7 +1008,7 @@ ggplot(Brand_sentiment,aes(x = Brand, y = Freq, fill = Sentiment))+
 
 ```
 
-``` {r}
+```{r}
 
 # DISTRIBUZIONE RATING PER BRAND
 Brand_rating <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$score_rating))
@@ -1047,7 +1038,8 @@ ggplot(Brand_rating,aes(x = Brand, y = Freq, fill = Rating))+
 
 
 ```
-Mediaworld is king. 
+
+Mediaworld is king.
 
 ```{r}
 # RELAZIONE TRA SENTIMENT E RATING
@@ -1060,7 +1052,7 @@ legend("topright", legend = c("Basso", "Medio", "Alto"), fill = c("blue", "white
 
 ## 4.2 Conclusioni sulla driver analysis
 
-``` {r}
+```{r}
 
 
 # TABELLA DRIVER SENTIMENT
@@ -1087,7 +1079,7 @@ names(Generale) <- c("Player", rep(c("Numero reviews","Media score","Media senti
 
 ```
 
-``` {r}
+```{r}
 
 # TABELLA DRIVER RATING
 kbl(Generale) %>%
@@ -1099,7 +1091,7 @@ kbl(Generale) %>%
   add_header_above(c(" " = 1," Generale" = 3, "Prezzo" = 3,"Servizio" = 3,"Ordini" = 3,"Location" = 3))
 ```
 
-``` {r}
+```{r}
 
 # TORTE PER OGNI BRAND CHE MOSTRA LA DISTRIBUZIONE DEI DRIVER
 Mediaworld_driver <- DriverAnalysis[DriverAnalysis$Player == "Mediaworld",c(15,16)]
@@ -1130,7 +1122,7 @@ ggplot(Mediaworld_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
 
 ```
 
-``` {r}
+```{r}
 Unieuro_driver <- DriverAnalysis[DriverAnalysis$Player == "Unieuro",c(15,16)]
 Unieuro_driver <- as.data.frame(table(Unieuro_driver$sentiment_labels, Unieuro_driver$SemiSupervised))
 
@@ -1159,7 +1151,7 @@ ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
 
 ```
 
-``` {r}
+```{r}
 Euronics_driver <- DriverAnalysis[DriverAnalysis$Player == "Euronics",c(15,16)]
 Euronics_driver <- as.data.frame(table(Euronics_driver$sentiment_labels, Euronics_driver$SemiSupervised))
 
@@ -1186,4 +1178,3 @@ ggplot(Euronics_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
         axis.text.x = element_text(color="#993333", angle=45))
 
 ```
-
