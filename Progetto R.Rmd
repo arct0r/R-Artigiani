@@ -1,0 +1,39 @@
+---
+title: "Progetto in R: Negozi di elettronica"
+author: "**Gruppo 5** (*William Santeramo, Davide Jemtchougov, Giacomo Amato, Maddalena Bozzola*)"
+date: "13/05/2024"
+output: 
+  html_document:
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+
+# Overview 
+
+Abbiamo gestito il progetto attraverso Github. Questa è la repo.
+https://github.com/arct0r/R-Artigiani
+
+## Costruzione del training data
+
+Durante la fase di recensione manuale del sentiment ci siamo accorti che la maggiorparte dei text
+proveniva da twitter. 
+Questi tweets erano quasi tutti neutrali e non ci è sembrato che avessero particolare utilità.
+
+Per questo motivo abbiamo deciso di creare un training data composto all'80% da places e al 20% da tweets.
+
+
+## Actual Algorythm Performances
+
+è un test molto grossolano che ci siamo inventati per verificare le performances degli algoritmi sul testing data.
+Grazie alla cross validation sappiamo come gli algoritmi si comportano sul training data. Ma non sappiamo nulla sul testing data. 
+Dunque ci siamo inventati l'AAP (Actual Algorythm Performances). 
+
+Abbiamo estratto un campione di testi (60 testi) dal testing data e li abbiamo recensiti manualmente.
+Queste sono state le performances degli algoritmi.
+
+Rispetto alla cross validation Bayes rimane il piu' performante ma ha comunque avuto un calo di prestazioni. 
+Essendo la stragrande maggioranza dei tweets inutili sarebbe interessante capire come il quantitativo di questi nel campione influenza l'accuracy.
+La presenza dei tweet riduce o aumenta l'accuracy? Ci porteremo questo dubbio nella tomba.
