@@ -786,6 +786,81 @@ cross_tab <- table(Ita_StoresReview$NB_sentiment, Ita_StoresReview$score_rating)
 heatmap(cross_tab, col = colorRampPalette(c("blue", "white", "red"))(256), main = "Matrice di confusione tra Sentiment e Rating")
 legend("topright", legend = c("Basso", "Medio", "Alto"), fill = c("blue", "white", "red"), title = "Rating")
 
-# GRAFICI DRIVER
+# GRAFICI 
 
+apply(DriverAnalysis, 2, function(x) sum(is.na(x)))
+
+
+Mediaworld_driver <- DriverAnalysis[DriverAnalysis$Player == "Mediaworld",c(14,15)]
+Unieuro_driver <- DriverAnalysis[DriverAnalysis$Player == "Unieuro",c(14,15)]
+Euronics_driver <- DriverAnalysis[DriverAnalysis$Player == "Euronics",c(14,15)]
+Mediaworld_driver <- as.data.frame(table(Mediaworld_driver$sentiment_labels, Mediaworld_driver$SemiSupervised))
+Unieuro_driver <- as.data.frame(table(Unieuro_driver$sentiment_labels, Unieuro_driver$SemiSupervised))
+Euronics_driver <- as.data.frame(table(Euronics_driver$sentiment_labels, Euronics_driver$SemiSupervised))
+
+Mediaworld_driver <- rename(
+  Mediaworld_driver, 
+  "Sentiment" = "Var1", 
+  "Driver" = "Var2"
+)
+
+Unieuro_driver <- rename(
+  Unieuro_driver, 
+  "Sentiment" = "Var1", 
+  "Driver" = "Var2"
+)
+
+Euronics_driver <- rename(
+  Euronics_driver, 
+  "Sentiment" = "Var1", 
+  "Driver" = "Var2"
+)
+
+Mediaworld_grafico <- ggplot(Mediaworld_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
+  geom_bar(position="stack",stat="identity") +   
+  
+  scale_fill_manual(values = c("#993333", "darkseagreen")) +
+  labs(title = "Mediaworld",
+       subtitle = "Come varia il sentiment nei diversi driver?") +
+  ylab(label="Valori assoluti") + 
+  xlab("") +
+  #la legenda viene generata in modo automatico
+  guides(fill=guide_legend(title="Sentiment")) + 
+  theme(plot.title = element_text(color = "black", size = 12, face = "bold"),
+        plot.subtitle = element_text(face = "plain"),
+        axis.title=element_text(size=10,face="plain"),
+        axis.text= element_text(size =10, face = "italic"),
+        axis.text.x = element_text(color="#993333", angle=45))
+
+Unieuro_grafico <- ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
+  geom_bar(position="stack",stat="identity") +   
+  
+  scale_fill_manual(values = c("#993333", "darkseagreen")) +
+  labs(title = "Unieuro",
+       subtitle = "Come varia il sentiment nei diversi driver?") +
+  ylab(label="Valori assoluti") + 
+  xlab("") +
+  #la legenda viene generata in modo automatico
+  guides(fill=guide_legend(title="Sentiment")) + 
+  theme(plot.title = element_text(color = "black", size = 12, face = "bold"),
+        plot.subtitle = element_text(face = "plain"),
+        axis.title=element_text(size=10,face="plain"),
+        axis.text= element_text(size =10, face = "italic"),
+        axis.text.x = element_text(color="#993333", angle=45))
+
+Euronics_grafico <- ggplot(Euronics_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
+  geom_bar(position="stack",stat="identity") +   
+  
+  scale_fill_manual(values = c("#993333", "darkseagreen")) +
+  labs(title = "Euronics",
+       subtitle = "Come varia il sentiment nei diversi driver?") +
+  ylab(label="Valori assoluti") + 
+  xlab("") +
+  #la legenda viene generata in modo automatico
+  guides(fill=guide_legend(title="Sentiment")) + 
+  theme(plot.title = element_text(color = "black", size = 12, face = "bold"),
+        plot.subtitle = element_text(face = "plain"),
+        axis.title=element_text(size=10,face="plain"),
+        axis.text= element_text(size =10, face = "italic"),
+        axis.text.x = element_text(color="#993333", angle=45))
 
