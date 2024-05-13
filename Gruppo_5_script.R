@@ -692,52 +692,52 @@ DriverAnalysis$doc_id <- NULL
 
 # 4 ----
 
+DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE,]
+
 # TABELLA GENERALE
-flex_table_stores = data.frame(unclass(table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment)))
-flex_table_stores$media_rating = round(c(mean(Ita_StoresReview$score_rating[Ita_StoresReview$Player=='Euronics'],na.rm = TRUE),
-                                         mean(Ita_StoresReview$score_rating[Ita_StoresReview$Player=='Mediaworld'],na.rm = TRUE),
-                                         mean(Ita_StoresReview$score_rating[Ita_StoresReview$Player=='Unieuro'],na.rm = TRUE)), 2)
-flex_table_stores = cbind(Player = c("Euronics", "Mediaworld", "Unieuro"), flex_table_stores)
-flex_table_stores
+Generale <- DriverAnalysis %>%
+  group_by(Player) %>%
+  summarise(n_rev = length(text),
+            media_rating = round(mean(score_rating,na.rm = TRUE),2),
+            media_sentiment = round(mean(sentimentAnalysis),2))
 
+Generale_ft <- flextable(Generale)
 
-set_flextable_defaults(
-  font.family = "Arial", font.size = 10, 
-  border.color = "gray", big.mark = "")
-
-ft <- flextable(head(flex_table_stores)) |> 
-  bold(part = "header") 
-ft
-
-ft |>
-  bg(j = "media_rating", 
-     bg = scales::col_quantile(palette = c("wheat", "red"), domain =NULL)) |> 
-  add_footer_lines("God help us. R is not that nice. Almost as bad as SQL")
+Generale_ft |>
+  bg(j = c("media_rating","media_sentiment"), 
+     bg = scales::col_quantile(palette = c("wheat", "red"), domain =NULL))
 
 # TABELLA DRIVER SENTIMENT
 
-DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE,]
+for (i in levels(DriverAnalysis$SemiSupervised)){
+  
+  df_i <- DriverAnalysis %>%
+    filter(SemiSupervised == i)
+  
+  summary_i <- df_i %>%
+    group_by(Player) %>%
+    summarise(n_rev = length(text),
+              media_rating = round(mean(score_rating,na.rm = TRUE),2),
+              media_sentiment = round(mean(sentimentAnalysis),2))
+  
+ Generale <- inner_join(Generale,summary_i,
+                           by = "Player")
+}
 
-df_drive_recensioni<- DriverAnalysis %>%
-  group_by(SemiSupervised) %>%
-  summarise(Numero_recensioni = n())
+# Modifico i nomi delle colonne per renderli più leggibili ed uniformarli
+names(Generale) <- c("Player", rep(c("Numero reviews","Media score","Media sentiment"),
+                                     length(levels(DriverAnalysis$SemiSupervised))+1))
 
-df_drive_sentiment <- DriverAnalysis %>%
-  group_by(SemiSupervised) %>%
-  summarise(Media_sentiment = mean(sentimentAnalysis))
 
-df_drive_rating <- DriverAnalysis %>%
-  group_by(SemiSupervised) %>%
-  summarise(Media_rating = mean(score_rating, na.rm = TRUE))
-
-rm(df_drive_rating)
-
-df_drive_tab <- full_join(DriverAnalysis, df_drive_sentiment, by = "SemiSupervised") %>%
-  full_join(df_drive_rating, by = "SemiSupervised") %>%
-  full_join(df_drive_recensioni, by = "SemiSupervised")
 
 # TABELLA DRIVER RATING
-
+kbl(Generale) %>%
+  kable_classic() %>%
+  column_spec(c(4,7,10,13,16), color = "white",
+              background = spec_color(Generale$`Media sentiment`, end =1, palette = c("red","orange","green"))) %>%
+  column_spec(c(3,6,9,12,15), color = "white",
+              background = spec_color(Generale$`Media score`, end =1, palette = c("red", "orange","green"))) %>%
+  add_header_above(c(" " = 1," Generale" = 3, "Prezzo" = 3,"Servizio" = 3,"Ordini" = 3,"Location" = 3))
 # GRAFICI
 
 # check
@@ -836,7 +836,7 @@ Euronics_driver <- rename(
   "Driver" = "Var2"
 )
 
-Mediaworld_grafico <- ggplot(Mediaworld_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
+ggplot(Mediaworld_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
   geom_bar(position="stack",stat="identity") +   
   
   scale_fill_manual(values = c("#993333", "darkseagreen")) +
@@ -852,7 +852,7 @@ Mediaworld_grafico <- ggplot(Mediaworld_driver,aes(x = Driver, y = Freq, fill = 
         axis.text= element_text(size =10, face = "italic"),
         axis.text.x = element_text(color="#993333", angle=45))
 
-Unieuro_grafico <- ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
+ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
   geom_bar(position="stack",stat="identity") +   
   
   scale_fill_manual(values = c("#993333", "darkseagreen")) +
@@ -868,7 +868,7 @@ Unieuro_grafico <- ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentim
         axis.text= element_text(size =10, face = "italic"),
         axis.text.x = element_text(color="#993333", angle=45))
 
-Euronics_grafico <- ggplot(Euronics_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
+ggplot(Euronics_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
   geom_bar(position="stack",stat="identity") +   
   
   scale_fill_manual(values = c("#993333", "darkseagreen")) +
@@ -883,4 +883,3 @@ Euronics_grafico <- ggplot(Euronics_driver,aes(x = Driver, y = Freq, fill = Sent
         axis.title=element_text(size=10,face="plain"),
         axis.text= element_text(size =10, face = "italic"),
         axis.text.x = element_text(color="#993333", angle=45))
-
