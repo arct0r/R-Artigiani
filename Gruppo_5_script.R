@@ -716,6 +716,26 @@ ft |>
 
 # TABELLA DRIVER SENTIMENT
 
+DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE,]
+
+df_drive_recensioni<- DriverAnalysis %>%
+  group_by(SemiSupervised) %>%
+  summarise(Numero_recensioni = n())
+
+df_drive_sentiment <- DriverAnalysis %>%
+  group_by(SemiSupervised) %>%
+  summarise(Media_sentiment = mean(sentimentAnalysis))
+
+df_drive_rating <- DriverAnalysis %>%
+  group_by(SemiSupervised) %>%
+  summarise(Media_rating = mean(score_rating, na.rm = TRUE))
+
+rm(df_drive_rating)
+
+df_drive_tab <- full_join(DriverAnalysis, df_drive_sentiment, by = "SemiSupervised") %>%
+  full_join(df_drive_rating, by = "SemiSupervised") %>%
+  full_join(df_drive_recensioni, by = "SemiSupervised")
+
 # TABELLA DRIVER RATING
 
 # GRAFICI
