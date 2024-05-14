@@ -590,6 +590,12 @@ textplot_wordcloud(Dfm_Places,
 # Verrà usato sia per il dizionario che per il semi-supervisionato
 # Abbiamo generato delle ulteriori keywords di contesto
 
+
+sapply(Driver@.Data, length)
+
+Driver@
+
+str(Driver)
 Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
                                      "economico", "concorrenziali", "sconto", 
                                      "offerta", "budget", "ragionevole","costo", "sostenibile", 
