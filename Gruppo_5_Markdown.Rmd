@@ -16,7 +16,28 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # 0. Overview
 
-Abbiamo gestito il progetto attraverso Github. Questa è la repo. <https://github.com/arct0r/R-Artigiani>
+Abbiamo gestito il progetto attraverso Github. Questa è la repo.
+<https://github.com/arct0r/R-Artigiani>
+
+Ci è stato affidato il compito di individuare, tra tre negozi di
+elettronica, quale fosse il migliore su cui investire attraverso una
+serie di recensioni che i brand avevano raccolto.
+
+Ci è stato fornito un dataset che contiene le seguenti variabili: 
+
+- Social: le fonti delle recensioni; 
+
+- Text: le recensioni; 
+
+- Lang_value: lingua in cui è stata scritta; 
+
+- Data_created_at: data di inserimento della recensione;
+
+- Count_likes: numero dei like; 
+
+- Score_Rating: una valutazione da 1 a 5; 
+
+- Player: il negozio in questione
 
 ```{r echo=FALSE, results='hide',message=FALSE}
 
@@ -82,8 +103,8 @@ Ita_StoresReview <- StoresReview[(StoresReview$lang_value == "it" |
 
 Il dataset sul quale dobbiamo effettuare analisi ha il seguente aspetto:
 
-```{r}
-kbl(StoresReview[1:10, ], longtable = T, booktabs = T, 
+```{r echo=FALSE}
+kbl(StoresReview[1:7, ], longtable = T, booktabs = T, 
     caption = "Dataset Negozi di Elettronica, Recensioni") %>%
     kable_styling(c("bordered", "condensed", "hover"), 
                   full_width = F, font_size = 11) %>%
@@ -91,19 +112,23 @@ kbl(StoresReview[1:10, ], longtable = T, booktabs = T,
     column_spec(2, width = "20em", width_min="2in", color = "black" )
 ```
 
-Le recensioni provengono da due fonti: places e twitter. Le lingue sono molteplici e i negozi di elettronica (Player) sono 3.
+Le recensioni provengono da due fonti: places e twitter. Le lingue sono
+molteplici e i negozi di elettronica (Player) sono 3.
 
 ```{r}
 table(StoresReview$lang_value)
 table(StoresReview$social, StoresReview$Player)
-print('Numero di NA:')
+```
+Nel dataset sono presenti testi vuoti:
+
+```{r}
 apply(StoresReview,2,function(x) sum(is.na(x)))
 ```
 
-Essendo le recensioni in italiano la stragrande maggioranza decidiamo di prendere in considerazione solo quelle e quindi eliminiamo le altre. Questo è il nostro dataset dopo questo preprocessing:
+Le recensioni in italiano sono la maggioranza, decidiamo di prendere in considerazione solo quelle ed eliminiamo le altre. Il nostro dataset assume ora questo aspetto
 
-```{r}
-kbl(Ita_StoresReview[1:10, ], longtable = T, booktabs = T, 
+```{r echo=FALSE}
+kbl(Ita_StoresReview[1:7, ], longtable = T, booktabs = T, 
     caption = "Dataset Negozi di Elettronica, Recensioni") %>%
     kable_styling(c("bordered", "condensed", "hover"), 
                   full_width = F, font_size = 11) %>%
@@ -111,11 +136,9 @@ kbl(Ita_StoresReview[1:10, ], longtable = T, booktabs = T,
     column_spec(2, width = "20em", width_min="2in", color = "black" )
 ```
 
-Per prepararci all'analisi dei testi creiamo il corpus e la DFM togliendo parole "fastidiose" (#hashtags, @usernames) provenienti dai tweets.
+Creiamo il corpus e la DFM togliendo le parole non utili (#hashtags, @usernames) provenienti dai tweets.
 
 ```{r}
-
-
 # Creazione corpus
 Corpus_Totale <- corpus(Ita_StoresReview)
 
@@ -145,14 +168,16 @@ dim(Dfm_Totale) # 3622 testi e 869 features
 
 # 2. Analisi del sentiment con algoritmi supervisionati
 
+Durante la fase di recensione manuale del sentiment ci siamo accorti che la maggior parte dei text proveniva da twitter, questi erano quasi tutti neutrali e non ci è sembrato che avessero particolare utilità.
+
+Per questo motivo abbiamo deciso di creare un training data (n=200) composto all’80% da places e al 20% da tweets.
+
+
 ## 2.1 Preparazione dei dati per gli algoritmi
 
-Durante la fase di recensione manuale del sentiment ci siamo accorti che la maggiorparte dei text proveniva da twitter. Questi tweets erano quasi tutti neutrali e non ci è sembrato che avessero particolare utilità.
-
-Per questo motivo abbiamo deciso di creare un training data (n=200) composto all'80% da places e al 20% da tweets.
+Procediamo con il campionamento casuale:
 
 ```{r}
-
 set.seed(001) 
 Training_places <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],  size = 160,  replace = FALSE)
 set.seed(002) 
@@ -160,7 +185,7 @@ Training_tweet <- sample(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
 
 ```
 
-```{r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide', message=FALSE}
 
 # Corpus per l'analisi manuale
 Training_Corpus <- c(Training_tweet, Training_places)
@@ -172,6 +197,10 @@ Test_Corpus <- Corpus_Totale[!(Corpus_Totale %in% Training_Corpus)]
 setequal(Corpus_Totale, union(Test_Corpus, Training_Corpus))
 # Risposta affermativa, ma si nota una differenza di 22 testi
 
+```
+  
+```{r}
+
 # Dataframe del Campione per poterlo esportare
 Campione <- data.frame(
   ID = attr(Training_Corpus, "docvars")$ID,
@@ -181,18 +210,27 @@ Campione <- data.frame(
 names(Campione) <- c("ID","Persona","text","sentiment")
 # Rinominazione necessaria per far riconoscere ad RStudio il text field
 
-#Esportare il Campione
-#write_xlsx(Campione, "Training Data Grezzo.xlsx") # NON RUNNARE !!!!!!!!!!!!!!!!!!!!!!!
-# Importo
-
-```
-
-```{r echo=FALSE, results='hide',message=FALSE}
 Campione <- read_excel("Training Data Grezzo.xlsx")
 
 Campione$sentiment <- ifelse(Campione$sentiment == -1, "Negativo", 
                              ifelse(Campione$sentiment == 0, "Neutro", 
                                     "Positivo"))
+
+```
+
+``` {r echo=FALSE}
+
+kbl(Campione[1:7, ], longtable = T, booktabs = T, 
+    caption = "Analisi manuale") %>%
+    kable_styling(c("bordered", "condensed", "hover"), 
+                  full_width = F, font_size = 11) %>%
+    row_spec(0, color = "black", bold = T, background = "#b8daba") %>%
+    column_spec(2, width = "20em", width_min="2in", color = "black" )
+
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+
 
 # Verifica celle vuote.
 apply(Campione, 2, function(x) sum(is.na(x)))
@@ -227,6 +265,12 @@ Dfm_Test <- dfm(tokens(Test_Corpus,
 
 Dfm_Test <- Dfm_Test[,!(colnames(Dfm_Test) %in% Parole_Brutte)]
 
+```
+
+Il numero delle features del training data e del testing data risultano le seguenti:
+
+``` {r}
+
 length(Dfm_Training@Dimnames$features) #1235
 length(Dfm_Test@Dimnames$features) #8533
 
@@ -235,6 +279,9 @@ Dfm_Test <- dfm_match(Dfm_Test,
                       features = featnames(Dfm_Training))
 # Dopo il match lunghezzze pari a 1235
 
+```
+
+``` {r echo=FALSE}
 # Verifica
 setequal(featnames(Dfm_Training), 
          featnames(Dfm_Test))
@@ -250,6 +297,8 @@ Dfm_Training@docvars$sentiment <- as.factor(Dfm_Training@docvars$sentiment)
 
 ## 2.2 Training e classificazione
 
+Cominciamo creando ed allenando l'algoritmo di Bayes:
+
 ```{r}
 
 # ALGORITMO NAIVE BAYES
@@ -260,6 +309,12 @@ NaiveBayesModel <- multinomial_naive_bayes(x=Matrice_Training,
 # Distribuzione del sentiment sul training
 summary(NaiveBayesModel)
 
+```
+
+Procediamo con la predizione usando l'algoritmo (di Bayes) appena allenato.
+
+``` {r}
+
 # Predizione sul test set
 Test_predictedNB <- predict(NaiveBayesModel,
                             Matrice_Test)
@@ -267,6 +322,8 @@ Test_predictedNB <- predict(NaiveBayesModel,
 # frequenze assolute sui 3400 testi del test
 table(Test_predictedNB)
 ```
+
+Iniziamo il primo training del random forest con 500 trees.
 
 ```{r}
 
@@ -281,21 +338,9 @@ RF # Error rate: 31%
 
 ```
 
-```{r}
-#  plot(RF, type = "l", col = c("black", "steelblue4", "violetred4", "springgreen4"), lty = 1,
-#       main = "Errori del modello Random Forest: variabile sentiment") +   
-#  legend("topright", horiz = FALSE, cex = 0.7, title = "Errori:",       
- #        fill = c("springgreen4", "black", "steelblue4", "violetred4"),        
-#         legend = c("Positivo", "Medio", "Negativo", "Neutro"))
+![Random Forest, errori](RFPlot.png)
 
-```
-
-```{r}
-#install.packages('EBImage')
-#library(EBImage)
-#fig <- plot_ly(type="image", z=readImage('RFPlot.png')*255)
-#fig
-```
+Identifichiamo il numero di trees minimi che commettono l'errore minore.
 
 ```{r}
 # Salvo tutti gli errori relativi al numero dei trees
@@ -304,6 +349,11 @@ Errori <- as.data.frame(RF$err.rate)
 # Identifico il PRIMO numero di ntrees con l'errore minimo
 which.min(Errori$OOB) # 23
 
+```
+
+Sperimentiamo riallenando il Random Forest con 23 trees. 
+
+``` {r}
 # Rifacciamo con ntree = 23
 set.seed(150)
 RF <- randomForest(y= Dfm_Training@docvars$sentiment,
@@ -313,9 +363,21 @@ RF <- randomForest(y= Dfm_Training@docvars$sentiment,
                    ntree=23)
 RF # 28% error rate
 
+```
+
+Ripetiamo la predizione.
+
+``` {r}
+
 Test_predictedRF <- predict(RF, Matrice_Test ,type="class")
 
 table(Test_predictedRF)
+
+```
+
+Ora creiamo ed allenaniamo il Support Vector Machine.
+
+``` {r}
 
 # SUPPORT VECTOR
 set.seed(175)
@@ -325,13 +387,21 @@ SupportVectorMachine <- svm(
 
 length(SupportVectorMachine$index) # 173 support vector
 
+```
+
+Predizioni del Support Vector Machine:
+
+``` {r}
 Test_predictedSV <- predict(SupportVectorMachine, Matrice_Test)
 
 table(Test_predictedSV)
 
 ```
 
-Abbiamo allenato 3 diversi algoritmi sul nostro training data con il sentiment manuale. Bayes, Random Forest e Support Vector Machine. Questo è un sample del loro risultato. In seguito analizzeremo piu' a fondo le loro performances attraverso il processo di cross validation.
+Abbiamo allenato 3 diversi algoritmi sul nostro training data con il sentiment recensito manualmente.
+Bayes, Random Forest e Support Vector Machine. 
+
+Questo è un sample del loro risultato. In seguito analizzeremo più a fondo le loro performances attraverso il processo di cross validation.
 
 ```{r}
 
@@ -344,6 +414,11 @@ results <- as.data.frame(rbind(prop.table(table(Test_predictedNB)),
 results$algorithm <- c("Naive Bayes", "Random Forest", "Support Vector Machine")
 
 df.long<-melt(results,id.vars=c("algorithm"))
+
+```
+
+
+```{r echo=FALSE}
 
 # Grafico che compara i risultati dei tre algoritmi
 ggplot(df.long,aes(algorithm,value,fill=variable))+
@@ -359,13 +434,16 @@ ggplot(df.long,aes(algorithm,value,fill=variable))+
 
 ```
 
-Wow! Che sta succedendo qui? I nostri algoritmi stanno dando valutazioni completamente diverse! Quale sarà il migliore?
+Wow! Che sta succedendo qui? I nostri algoritmi stanno dando valutazioni
+completamente diverse! Quale sarà il migliore?
 
 ## 2.3 Cross validation
 
-Per la cross validation abbiamo scelto un k=5.
+Per la cross validation abbiamo scelto un numero di subset pari a 5 (k=5).
 
-```{r echo=FALSE, results='hide',message=FALSE}
+Misuriamo l'accuracy ed f1 score dei tre algoritmi:
+
+```{r echo=FALSE, results='hide', message=FALSE}
 
 # Abbiamo i tre risultati, capiamo quale algoritmo performa meglio
 
@@ -420,7 +498,6 @@ AverageF1_NB<- mean(colMeans(NB_Prediction[-1] ))
 
 ```
 
-è arrivata l'ora di testare la star, Naive Bayes. Come si comporterà il nostro eroe?
 
 ```{r}
 
@@ -432,7 +509,7 @@ AverageF1_NB # 72,7%
 
 **Wow!!!!!!!!!!!!** 81%. Un risultato strabiliante.
 
-```{r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide', message=FALSE}
 
 # RANDOM FOREST
 for(i in 1:k){
@@ -479,7 +556,8 @@ AverageF1_RF<- mean(colMeans(RF_Predictions[-1] ))
 
 ```
 
-Nonostante abbiamo diminuito il numero di trees l'accuracy risulta inferiore rispetto a Bayes.
+Nonostante abbiamo diminuito il numero di trees l'accuracy risulta
+inferiore rispetto a Bayes.
 
 ```{r}
 
@@ -489,7 +567,7 @@ AverageF1_RF  #52,6%
 
 ```
 
-```{r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide', message=FALSE}
 
 # SUPPORT VECTOR MACHINE
 for(i in 1:k){
@@ -537,7 +615,7 @@ AverageF1_SVM<- mean(colMeans(SVM_Prediction[-1] ))
 
 ```
 
-Ci risulta l`utilizzo di 173 support vectors. L`accuracy del support Vector Machine si posiziona tra Bayes e Random Forest.
+
 
 ```{r}
 
@@ -548,7 +626,7 @@ AverageF1_SVM # 62,2%
 
 ```
 
-```{r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide', message=FALSE}
 
 # CONFRONTO
 AccNB <- as.data.frame(AverageAccuracy_NB )
@@ -619,11 +697,11 @@ grid.arrange(plot_accuracy, plot_f1, nrow=2) #bayes
 
 ```
 
-Abbiamo determinato quale fosse l'algoritmo piu' performante basandoci sull'accuratezza e su f1. Bayes risulta il piu' performante.
+Determiniamo così che Bayes è l’algoritmo più performante
 
-![](f1%20bayes.png)
+![](f1 bayes.png)
 
-```{r echo=FALSE, results='hide',message=FALSE}
+```{r echo=FALSE, results='hide', message=FALSE}
 
 
 # Creo dataframe che salva le predizioni dei tre algoritmi.
@@ -647,13 +725,18 @@ Ita_StoresReview <- merge(Ita_StoresReview, Df_sentiment, by='ID')
 
 ```
 
-## 2.4 AAP
+## 2.4 AAP (Actual Algorythm Performance)
 
-è un test che ci siamo inventati per verificare le performances degli algoritmi sul testing data. Grazie alla cross validation sappiamo come gli algoritmi si comportano sul training data. Ma non sappiamo nulla della loro accuracy sul testing data. Dunque ci siamo inventati l'AAP (Actual Algorythm Performances).
+Il test che è stato creato per valutare le prestazioni degli algoritmi sul set di dati di testing è conosciuto come cross validation. Grazie a questa tecnica, siamo in grado di comprendere come gli algoritmi si comportino con il set di dati di addestramento. 
+
+Tuttavia, non abbiamo informazioni sull'accuratezza degli algoritmi con il set di dati di testing. Pertanto, è stato ideato l'AAP (Actual Algorithm Performances).
 
 Abbiamo estratto un campione di testi (60 testi) dal testing data e li abbiamo recensiti manualmente. Abbiamo posizionato queste recensioni di fianco a quelle degli algoritmi.
 
-```{r echo=FALSE, results='hide',message=FALSE}
+Abbiamo infine calcolato l`accuracy di tutti e tre gli algoritmi in questo campione. Queste sono state le performances:
+
+
+```{r echo=FALSE, results='hide', message=FALSE}
 
 # Abbiamo voluto campionare una sessantina di testi nel test set
 # per rifare l'analisi manuale e fare una stima dell'accuratezza dei tre algoritmi
@@ -695,9 +778,9 @@ AAP_confronto <- data.frame(
 rownames(AAP_confronto) <- c("Freq Assoluta", "Freq Relativa")
 ```
 
-```{r}
+```{r echo=FALSE}
 
-kbl(AAP_test_data[1:10, ], longtable = T, booktabs = T, 
+kbl(AAP_test_data[1:7, ], longtable = T, booktabs = T, 
     caption = "Dataset Negozi di Elettronica, Recensioni") %>%
     kable_styling(c("bordered", "condensed", "hover"), 
                   full_width = F, font_size = 11) %>%
@@ -706,7 +789,8 @@ kbl(AAP_test_data[1:10, ], longtable = T, booktabs = T,
 
 ```
 
-Abbiamo infine calcolato l\`accuracy di tutti e tre gli algoritmi in questo campione. Queste sono state le performances:
+Abbiamo infine calcolato l'accuracy di tutti e tre gli algoritmi in
+questo campione. Queste sono state le performances:
 
 ```{r}
 
@@ -714,23 +798,25 @@ round(AAP_confronto[2,],2)
 
 ```
 
-Rispetto alla cross validation Bayes rimane il piu' performante ma ha comunque registrato un calo di prestazioni. Essendo la stragrande maggioranza dei tweets inutili sarebbe interessante capire come il quantitativo di questi nel campione influenza l'accuracy. La presenza dei tweet riduce o aumenta l'accuracy? Ci porteremo questo dubbio nella tomba.
+Rispetto alla cross validation Bayes rimane il piu’ performante ma ha comunque registrato un calo di prestazioni.
+
+Essendo la stragrande maggioranza dei tweets inutili sarebbe interessante capire come il quantitativo di questi nel campione influenza l’accuracy.
 
 # 3. Driver Analysis
 
 Frequenze delle caratteristiche del Corpus
 
 ```{r}
-
 # Frequenze delle caratteristiche del Corpus
 apply(textstat_summary(Corpus_Totale)[,2:11], 2, sum)
 ```
 
-Notiamo la presenza di emoji, tag, urls e altri elementi disturbanti per l'analisi.
+Notiamo la presenza di emoji, tag, urls e altri elementi disturbanti per
+l'analisi.
+
+Abbiamo voluto prendere in considerazione solo le recensioni di places per individuare i possibili driver del dataset.
 
 ```{r}
-
-
 # Abbiamo voluto prendere in considerazione solo le recensioni di places
 # per individuare i possibili driver del dataset.
 Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == "places"],
@@ -750,11 +836,13 @@ Dfm_Places <- dfm(tokens(Corpus_Totale[attr(Corpus_Totale, "docvars")$social == 
 RILEVAZIONE DELLE KEYWORDS
 
 ```{r}
-
 # Vogliamo rappresentare le top 50 sui grafici
 Parole_Popolari <- textstat_frequency(Dfm_Places, n =50)
 Parole_Popolari$feature <- with(Parole_Popolari, reorder(feature, frequency))
 
+```
+
+```{r echo=FALSE}
 ggplot(Parole_Popolari, aes(x=frequency, y=feature)) +
  geom_point(size = 1.5, color = "Darkorange2") +
   theme_bw() +
@@ -766,7 +854,7 @@ labs(x = "Frequenza", y = "Features",
 
 ```
 
-```{r message=FALSE}
+```{r echo=FALSE, message=FALSE}
 
 textplot_wordcloud(Dfm_Places, 
                   min_size = 1.5,  
@@ -777,16 +865,16 @@ textplot_wordcloud(Dfm_Places,
                    random_color = FALSE,
                    rotation = 0,    #rotazione delle parole
                    colors = RColorBrewer::brewer.pal(8,"Dark2"))
-# Abbiamo individuato 4 possibili driver: Prezzo, Servizio, Ordini e Location
 ```
 
 ## 3.1 Scelta delle Keywords e Driver
 
+Abbiamo individuato 4 possibili driver: Prezzo, Servizio, Ordini e Location.
+
+Le seguenti keywords sono state in parte generate ed in parte scelte dalla lista di features. Verranno utilizzate sia per il dizionario che per l'algoritmo supervisionato.
+
+
 ```{r}
-
-
-# Verrà usato sia per il dizionario che per il semi-supervisionato
-# Abbiamo generato delle ulteriori keywords di contesto
 
 Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "prezzo", "economicità", 
                                      "economico", "concorrenziali", "sconto", 
@@ -820,6 +908,19 @@ Driver <- dictionary(list(prezzo = c("promozione", "risparmio", "qualità", "pre
                                        "illuminata", "spazio", "facile", 
                                        "tranquilla", "negozio", "posto", "affollato", "piccolo", "disordinato", "bell", "ben")))
 
+```
+
+Questi sono i numeri di features per ogni categoria.
+
+- Prezzo: 27
+- Servizio: 101
+- Ordini: 39
+- Location: 35
+
+
+Abbiamo applicato lo stemming alle keywords.
+
+``` {r}
 # Funzione che applicherà lo stemming sulle keywords del driver
 stem_words <- function(words) {
   stemmed_words <- wordStem(words, language = "italian")
@@ -854,6 +955,8 @@ DriverAnalysis <- full_join(Ita_StoresReview, Driver_Conv_Rev)
 
 ## 3.2 Sentiment Analysis
 
+Mettiamo a confronto attraverso un grafico sentiment e rating, i sentiment "positivo" “negativo” vengono messi in relazione con ogni livello del rating
+
 ```{r}
 
 Dizionario <- get_sentiment_dictionary(dictionary = 'nrc', 
@@ -865,11 +968,18 @@ Store_reviews_sentiment <- get_sentiment(Corpus_Totale,
 DriverAnalysis$sentimentAnalysis <- Store_reviews_sentiment
 
 DriverAnalysis$sentiment_labels <- ifelse(DriverAnalysis$sentimentAnalysis <= 0, "Negativo", "Positivo")
+```
 
-# GGrafico che dati i 5 livelli di rating mostra la suddivisione nel sentiment
+
+```{r echo=FALSE}
+# Grafico che dati i 5 livelli di rating mostra la suddivisione nel sentiment
 RatingXsentiment <- table(DriverAnalysis$sentiment_labels, DriverAnalysis$score_rating)
 RatingXsentiment <- as.data.frame(RatingXsentiment)
 colnames(RatingXsentiment) <- c("Sentiment","Rating","Freq")
+```
+
+
+```{r echo=FALSE}
 
 ggplot(RatingXsentiment,aes(Rating, Freq, fill=Sentiment))+
   geom_bar(position="stack",stat="identity") +   
@@ -887,11 +997,9 @@ ggplot(RatingXsentiment,aes(Rating, Freq, fill=Sentiment))+
 
 ```
 
-Paragrafo che spieghi il grafico
-
 ## 3.3 Emotion Analysis
 
-```{r}
+```{r echo=FALSE}
 
 # EmotionAnalysis <- get_nrc_sentiment(Corpus_Totale)
 
@@ -908,13 +1016,13 @@ Paragrafo che spieghi il grafico
 
 ```
 
-![EmotionAnalysis](emotion.png)
+Con un grafico osserviamo come, in proporzione, le varie emozioni si presentano nelle recensioni.
 
-Qualche commento su sto grafico
+![EmotionAnalysis](emotion.png)
 
 ## 3.4 Newsmap
 
-Iniziare con un paragrafo
+Seconda parte dell’analisi, qui lavoriamo con l’algoritmo semi supervisionato.
 
 ```{r echo=FALSE, results='hide',message=FALSE}
 
@@ -937,6 +1045,10 @@ DriverAnalysis$SemiSupervised <- predict(TextModel)
 ```{r}
 round(prop.table(table(predict(TextModel))), 2)*100 # % driver nel dataset
 
+```
+
+
+```{r}
 DriverAnalysis$Dizionario <- ifelse(DriverAnalysis$prezzo > 0, "Prezzo",
                                     ifelse(DriverAnalysis$servizio > 0, "Servizio",
                                            ifelse(DriverAnalysis$ordini > 0, "Ordini",
@@ -949,20 +1061,25 @@ DriverAnalysis$doc_id <- NULL
 
 # 4. Conclusioni e considerazioni
 
+Vogliamo basarci sui risultati dell'algoritmo semi-supervisionato, ma si nota la presenza di NA nelle colonne Player e del semi-supervisionato.
+
 ```{r}
-
-
 apply(DriverAnalysis, 2, function(x) sum(is.na(x)))
-# Vogliamo basarci sui risultati dell'algoritmo semi-supervisionato,
-# ma si nota la presenza di NA nelle colonne Player e del semi-supervisionato
+```
+
+```{r echo=FALSE}
 DriverAnalysis <- DriverAnalysis[is.na(DriverAnalysis$SemiSupervised) == FALSE &
                                    is.na(DriverAnalysis$Player) == FALSE,]
 ```
 
 ## 4.1 Conclusioni generali
 
-```{r}
+Per interpretare i dati procediamo con la creazione di grafici che ci permettano di vedere nel dettaglio sentiment, rating e driver.
 
+In questa tabella visualizziamo i valori medi di rating e sentiment nei tre brand, inseriamo anche il numero totale di recensioni. Scegliamo di assegnare il livello di intensità colore in base al peso del valore.
+
+
+```{r}
 
 # TABELLA GENERALE
 # Recensioni, rating e sentiment in base al brand
@@ -982,7 +1099,12 @@ Generale_ft |>
 
 ```
 
-```{r}
+Notiamo che il brand con il rating più alto è Euronics, che supera di poco Mediaworld, Mediaworld però ha una media di sentiment decisamente più alta, probabilmente il fatto che il numero di recensioni di Euronics sia più basso va ad impattare sulla media del rating.
+
+Creiamo poi un grafico che mostra in che modo si distribuisce il sentiment nei tre brand nel dettaglio. Mediaworld ha i valori di positivi più alti.
+
+
+```{r echo=FALSE}
 # DISTRIBUZIONE SENTIMENT PER BRAND
 Brand_sentiment <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$NB_sentiment))
 
@@ -1010,7 +1132,9 @@ ggplot(Brand_sentiment,aes(x = Brand, y = Freq, fill = Sentiment))+
 
 ```
 
-```{r}
+Facciamo lo stesso con i rating.
+
+```{r echo=FALSE}
 
 # DISTRIBUZIONE RATING PER BRAND
 Brand_rating <- as.data.frame(table(Ita_StoresReview$Player, Ita_StoresReview$score_rating))
@@ -1041,7 +1165,7 @@ ggplot(Brand_rating,aes(x = Brand, y = Freq, fill = Rating))+
 
 ```
 
-Mediaworld is king.
+Attraverso la matrice di confusione vogliamo controllare qual è il livello di correlazione tra rating e sentiment.
 
 ```{r}
 # RELAZIONE TRA SENTIMENT E RATING
@@ -1053,6 +1177,8 @@ legend("topright", legend = c("Basso", "Medio", "Alto"), fill = c("blue", "white
 ```
 
 ## 4.2 Conclusioni sulla driver analysis
+
+Creiamo una tabella riassuntiva per le medie di sentimet, rating, driver per ogni brand.
 
 ```{r}
 
@@ -1081,7 +1207,7 @@ names(Generale) <- c("Player", rep(c("Numero reviews","Media score","Media senti
 
 ```
 
-```{r}
+```{r echo=FALSE}
 
 # TABELLA DRIVER RATING
 kbl(Generale) %>%
@@ -1093,7 +1219,7 @@ kbl(Generale) %>%
   add_header_above(c(" " = 1," Generale" = 3, "Prezzo" = 3,"Servizio" = 3,"Ordini" = 3,"Location" = 3))
 ```
 
-```{r}
+```{r echo=FALSE}
 
 # TORTE PER OGNI BRAND CHE MOSTRA LA DISTRIBUZIONE DEI DRIVER
 Mediaworld_driver <- DriverAnalysis[DriverAnalysis$Player == "Mediaworld",c(15,16)]
@@ -1124,7 +1250,7 @@ ggplot(Mediaworld_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
 
 ```
 
-```{r}
+```{r echo=FALSE}
 Unieuro_driver <- DriverAnalysis[DriverAnalysis$Player == "Unieuro",c(15,16)]
 Unieuro_driver <- as.data.frame(table(Unieuro_driver$sentiment_labels, Unieuro_driver$SemiSupervised))
 
@@ -1152,7 +1278,7 @@ ggplot(Unieuro_driver,aes(x = Driver, y = Freq, fill = Sentiment))+
         axis.text.x = element_text(color="#993333", angle=45))
 ```
 
-```{r}
+```{r echo=FALSE}
 Euronics_driver <- DriverAnalysis[DriverAnalysis$Player == "Euronics",c(15,16)]
 Euronics_driver <- as.data.frame(table(Euronics_driver$sentiment_labels, Euronics_driver$SemiSupervised))
 
